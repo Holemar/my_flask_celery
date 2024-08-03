@@ -1,0 +1,17 @@
+[
+  {
+    "name": "task_ping",
+    "task": "my_celery_mq.tasks.ping",
+    "cron": 10
+  },
+  {
+    "name": "task_master_notify",
+    "task": "my_celery_mq.tasks.master_notify",
+    "cron": "*/1 * * * *"
+  },
+  {
+    "name": "tasks_master_fetch",
+    "task": "my_celery_mq.tasks.master_fetch",
+    "cron": "5"
+  }
+]
