@@ -8,72 +8,30 @@
 
     :copyright: (c) 2024 by Holemar Feng<daillow@gmail.com>.
 """
-import fnmatch
 import os
 import sys
+import fnmatch
 import logging
 import importlib
 import inspect
-import re
-import csv
 import argparse
-import json
 
-from flask import Flask
-from werkzeug.routing import BaseConverter
 import click
+import celery
+from flask import Flask
+from mongoengine import register_connection
 
 from utils import celery_util
-import bello_adam
-import bello_adam.auth
-from bello_adam.io.elastic import Elastic
-from bello_adam.io.neo4j import Neo4j
-from bello_adam.utils import api_prefix, extract_key_values, discovery_items_in_package, import_submodules, \
-    load_rbac_policy
-from celery import Celery, current_app, Task
-from celery.schedules import crontab
-from mongoengine import register_connection
-from bello_adam import ResourceView, ResourceDocument, GraphDocument, Service, Middleware
-from bello_adam.cos_connection import register_source
-from bello_adam.log_filter import WerkzeugLogFilter
+from utils.blueprint import Blueprint
+from utils.import_util import import_submodules, discovery_items_in_package
+from utils.url_util import RegexConverter, underscore
+from utils.log_filter import WerkzeugLogFilter
+from utils.view import ResourceView
 
-import bello_adam.models
-import bello_adam.views
-import bello_adam.services
-import bello_adam.middlewares
+from bello_adam import ResourceDocument, GraphDocument, Service, Middleware
 
 
-logger = logging.getLogger('utils.flask_app')
-
-
-def underscore(word):
-    """
-    Make an underscored, lowercase form from the expression in the string.
-
-    Example::
-
-        >>> underscore("DeviceType")
-        "device_type"
-
-    As a rule of thumb you can think of :func:`underscore` as the inverse of
-    :func:`camelize`, though there are cases where that does not hold::
-
-        >>> camelize(underscore("IOError"))
-        "IoError"
-
-    """
-    word = re.sub(r"([A-Z]+)([A-Z][a-z])", r'\1_\2', word)
-    word = re.sub(r"([a-z\d])([A-Z])", r'\1_\2', word)
-    word = word.replace("-", "_")
-    return word.lower()
-
-
-class RegexConverter(BaseConverter):
-    """ Extend werkzeug routing by supporting regex for urls/API endpoints """
-
-    def __init__(self, url_map, *items):
-        super(RegexConverter, self).__init__(url_map)
-        self.regex = items[0]
+logger = logging.getLogger(__name__)
 
 
 class Adam(Flask):
@@ -119,7 +77,6 @@ class Adam(Flask):
         self.settings = settings
 
         self.load_config()
-        self.myconfigs = {}
 
         # name
         self.name = self.config.get('APP_NAME') or 'default'
@@ -179,74 +136,15 @@ class Adam(Flask):
             self.auth_backends.append(clsmembers[0][1]())
 
         if enable_celery:
-            self.celery = Celery(self.name)
+            self.celery = celery.Celery(self.name)
             self.celery.config_from_object(self.config.get('CeleryConfig'))
 
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
             celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
 
-            task_schedule_path = os.path.join(root, task_path, 'schedule.json')
-            if os.path.exists(task_schedule_path):
-                self.load_task_schedule(task_schedule_path)
-
         for k, s in self.services.items():
             logger.debug('service on_loaded trigger %s', k)
             s.on_loaded()
-
-    def pasrse_cron(self, cron):
-        """
-        parse cron format to celery cron
-        http://www.nncron.ru/help/EN/working/cron-format.htm
-        <Minute> <Hour> <Day_of_the_Month> <Month_of_the_Year> <Day_of_the_Week>
-        """
-        if type(cron) is str:
-            minute, hour, day_of_month, month_of_year, day_of_week = cron.split(' ')
-            return crontab(minute=minute, hour=hour, day_of_month=day_of_month, day_of_week=day_of_week,
-                           month_of_year=month_of_year)
-        else:
-            return cron
-
-    def load_task_schedule(self, path):
-        if not os.path.exists(path):
-            return
-        schedule = {}
-        with open(path, 'r') as reader:
-            rules = json.load(reader)
-            for r_task in rules:
-                name = r_task['name']
-                task = r_task['task']
-                cron = self.pasrse_cron(r_task['cron'])
-                schedule[name] = {
-                    'task': task,
-                    'schedule': cron
-                }
-        self.celery.conf.beat_schedule = schedule
-
-    def load_config_csv(self, path):
-        """
-        Load json config file in app config
-        """
-        if path not in self.myconfigs:
-            config = None
-            config_path = os.path.join(self.root, 'config', path)
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as reader:
-                    self.myconfigs[path] = csv.reader(reader)
-
-        return self.myconfigs.get(path)
-
-    def load_config_json(self, path):
-        """
-        Load json config file in app config
-        """
-        if path not in self.myconfigs:
-            config = None
-            config_path = os.path.join(self.root, 'config', path)
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as reader:
-                    self.myconfigs[path] = json.load(reader)
-
-        return self.myconfigs.get(path)
 
     def load_build_in_commands(self):
         """
@@ -260,51 +158,49 @@ class Adam(Flask):
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor', 'shell'])
-        parser.add_argument('-p', '--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')
-        parser.add_argument('-c', '--concurreny', default='1')
-        parser.add_argument('-Q', '--queues', default=self.name)
-        parser.add_argument('--prefetch-multiplier', default='1')
-        parser.add_argument('--basic-auth', default='{}:{}'.format(self.name, self.config.get('MONITOR_PASSWORD')))
-        args, unknownargs = parser.parse_known_args()
+        parser.add_argument('-m', '--mode', choices=['worker', 'beat'])
+        parser.add_argument('-p', '--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
+        parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
+        parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
+        parser.add_argument('-Q', '--queues', default=','.join(self.config.get('ALL_QUEUES')))
+        parser.add_argument('--prefetch-multiplier', default='')
+        parser.add_argument('--logfile', default='')
+        parser.add_argument('--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
+        args, unknown_args = parser.parse_known_args()
+        if args.logfile:
+            # 没有日志文件的目录，则先创建目录，避免因此报错
+            file_path = os.path.dirname(os.path.abspath(args.logfile))
+            if not os.path.isdir(file_path):
+                os.makedirs(file_path)
+
+        celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
             print(self.url_map)
         elif args.mode == 'api':
             host = os.environ.get('HOST') or '0.0.0.0'
-            port = int(os.environ.get('PORT') or '5000')
+            port = int(os.environ.get('PORT') or '8000')
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
             super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
         elif args.mode == 'worker':
-            with self.app_context():
-                self.celery.start(argv=['celery', 'worker', '-l', 'info', '-c', args.concurreny,
-                                        '-Q', args.queues, '--prefetch-multiplier', args.prefetch_multiplier,
-                                        '--pool', args.pool] + unknownargs)
+            celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
+            if args.concurrency:
+                celery_argv += ['-c', args.concurrency]
+            if args.prefetch_multiplier:
+                celery_argv += ['--prefetch-multiplier', args.prefetch_multiplier]
+            self.celery.start(argv=celery_argv + unknown_args)
         elif args.mode == 'beat':
-            with self.app_context():
-                self.celery.start(argv=['celery', 'beat'] + unknownargs)
+            self.celery.start(argv=celery_argv + ['beat', '-l', args.loglevel] + unknown_args)
         elif args.mode == 'monitor':
-            with self.app_context():
-                self.celery.start(argv=['celery', 'flower', '--basic-auth=' + args.basic_auth])
+            self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
         else:
             print('Invalid Usage..')
-
-    def _overwrite_res(self, sources, patches, is_module=False):
-        name_cls = {}
-        if is_module:
-            list(map(lambda item: name_cls.update({item.__name__.split('.')[-1]: item}), sources))
-            list(map(lambda item: name_cls.update({item.__name__.split('.')[-1]: item}), patches))
-            return list(name_cls.values())
-        else:
-            list(map(lambda item: name_cls.update({item[0]: item[1]}), sources))
-            list(map(lambda item: name_cls.update({item[0]: item[1]}), patches))
-            return list(name_cls.items())
 
     def load_views(self, path):
         """
         load all view
         """
         # Load native views
-        all_view_modules = list(import_submodules(bello_adam.views).values())
+        all_view_modules = list()
         if os.path.exists(path):
             package_name = path.replace('/', '.')
             package = importlib.import_module(package_name)
@@ -314,7 +210,7 @@ class Adam(Flask):
         for module in all_view_modules:
             lookup_view = lambda x: inspect.isclass(x) and x != ResourceView and not getattr(x, "_meta", {}).get(
                 'abstract') and issubclass(x, ResourceView)
-            lookup_bp = lambda x: isinstance(x, bello_adam.blueprint.Blueprint)
+            lookup_bp = lambda x: isinstance(x, Blueprint)
             views = inspect.getmembers(module, lookup_view)
 
             # filter, get rid of alias,
@@ -359,8 +255,7 @@ class Adam(Flask):
         """
         load all mode logic
         """
-        # Load System Models
-        all_models_modules = list(import_submodules(bello_adam.models).values())
+        all_models_modules = list()
 
         if os.path.exists(path):
             package_name = path.replace('/', '.')
@@ -372,11 +267,9 @@ class Adam(Flask):
             lookup_model = lambda x: inspect.isclass(x) and x != ResourceDocument and issubclass(x, ResourceDocument)
             models = inspect.getmembers(module, lookup_model)
             # filter, get rid of alias,
-            # import bello_adam.views.user as BaseUser
             models = list(filter(lambda x: x[0] == x[1].__name__, models))
             if not models:
                 continue
-                raise SystemError('Missing Model ' + module.__name__)
             name = models[-1][0]
             resource = name
             cls_model = models[-1][1]
@@ -386,40 +279,17 @@ class Adam(Flask):
                 self.models[new_resource] = cls_model
             self.models[resource] = cls_model
 
-    def load_graph_models(self, path):
-        """
-        load all mode logic
-        """
-        # Load System Models
-        all_graphs = discovery_items_in_package(bello_adam.models,
-                                                lambda x: inspect.isclass(x) and x != GraphDocument and issubclass(x,
-                                                                                                                   GraphDocument))
-
-        if os.path.exists(path):
-            package_name = path.replace('/', '.')
-            package = importlib.import_module(package_name)
-            customize_graphs = discovery_items_in_package(package, lambda x: inspect.isclass(
-                x) and x != GraphDocument and issubclass(x, GraphDocument))
-            all_graphs = all_graphs + customize_graphs
-
-        for name, model in all_graphs:
-            logger.debug('Load graph model %s', name)
-            self.models[name] = model
-
     def load_middleware(self, path):
         """
         load all services
         """
-        # Load System Services
-        all_middlewares = discovery_items_in_package(bello_adam.middlewares,
-                                                     lambda x: inspect.isclass(x) and x != Middleware and issubclass(x,
-                                                                                                                     Middleware))
+        all_middlewares = []
+        func_lookup = lambda x: inspect.isclass(x) and x != Middleware and issubclass(x, Middleware)
 
         if os.path.exists(path):
             package_name = path.replace('/', '.')
             package = importlib.import_module(package_name)
-            customize_middlewares = discovery_items_in_package(package, lambda x: inspect.isclass(
-                x) and x != Middleware and issubclass(x, Middleware))
+            customize_middlewares = discovery_items_in_package(package, func_lookup)
             all_middlewares = all_middlewares + customize_middlewares
 
         for _k, _m in all_middlewares:
@@ -430,10 +300,7 @@ class Adam(Flask):
         """
         load all services
         """
-        # Load System Services
-        all_services = discovery_items_in_package(bello_adam.services,
-                                                  lambda x: inspect.isclass(x) and x != Service and issubclass(x,
-                                                                                                               Service))
+        all_services = []
 
         if os.path.exists(path):
             package_name = path.replace('/', '.')
@@ -459,19 +326,7 @@ class Adam(Flask):
 
         Since we are a Flask subclass, any configuration value supported by
         Flask itself is available (besides Adam's proper settings).
-
-        .. versionchanged:: 0.6
-           SchemaErrors raised during configuration
-        .. versionchanged:: 0.5
-           Allow EVE_SETTINGS envvar to be used exclusively. Closes #461.
-
-        .. versionchanged:: 0.2
-           Allow use of a dict object as settings.
         """
-
-        # load defaults
-        self.config.from_object('bello_adam.default_settings')
-
         # overwrite the defaults with custom user settings
         if isinstance(self.settings, dict):
             self.config.update(self.settings)
@@ -495,9 +350,7 @@ class Adam(Flask):
                                         return os.path.join(root, file_name)
 
                 # try to load file from environment variable or settings.py
-                pyfile = find_settings_file(
-                    os.environ.get('EVE_SETTINGS') or self.settings
-                )
+                pyfile = find_settings_file(os.environ.get('EVE_SETTINGS') or self.settings)
 
             if not pyfile:
                 raise IOError('Could not load settings.')
@@ -508,18 +361,18 @@ class Adam(Flask):
                 raise
 
         # flask-pymongo compatibility
-        self.config['MONGO_CONNECT'] = self.config['MONGO_OPTIONS'].get(
-            'connect', True
-        )
+        self.config['MONGO_CONNECT'] = self.config['MONGO_OPTIONS'].get('connect', True)
 
     @property
     def api_prefix(self):
         """ Prefix to API endpoints.
-
-        .. versionadded:: 0.2
         """
-        return api_prefix(self.config['URL_PREFIX'],
-                          self.config['API_VERSION'])
+        url_prefix = self.config.get('URL_PREFIX')
+        api_version = self.config.get('API_VERSION')
+
+        prefix = '/%s' % url_prefix if url_prefix else ''
+        version = '/%s' % api_version if api_version else ''
+        return prefix + version
 
     def _add_url_rule(self, action_url, endpoint, view_func, methods):
         if 'OPTIONS' not in methods:
@@ -601,17 +454,6 @@ class Adam(Flask):
                         if method.get('url'):
                             reference_action_url = reference_action_url + '/' + method['url']
                         self._add_url_rule(reference_action_url, endpoint, view_func=view, methods=method['methods'])
-                    try:
-                        document_type = field.document_type
-                        for _, sub_field in document_type._fields.items():
-                            if isinstance(sub_field, RemoteFileField):
-                                media = sub_field.name.lower()
-                                endpoint = '|item_reference_file' + '|' + name + '|' + media
-                                media_action_url = '%s/<%s:%s>/<%s:%s>/<%s:%s>' % (
-                                    url, item_id_format, 'id', item_id_format, 'field', item_id_format, 'sub_field')
-                                self._add_url_rule(media_action_url, endpoint, view_func=view, methods=['GET'])
-                    except Exception as ex:
-                        pass
                 if isinstance(field, ListField) and isinstance(field.field, EmbeddedDocumentField):
                     embedded = field.name
                     for action, method in view.embedded_methods.items():
@@ -633,17 +475,6 @@ class Adam(Flask):
                         if method.get('url'):
                             relation_action_url = relation_action_url + '/' + method['url']
                         self._add_url_rule(relation_action_url, endpoint, view_func=view, methods=method['methods'])
-                elif isinstance(field, RemoteFileField):
-                    # item_file
-                    media = field.name.lower()
-                    endpoint = '|item_file' + '|' + name + '|' + media
-                    media_action_url = '%s/<%s:%s>/%s' % (url, item_id_format, 'id', media)
-                    self._add_url_rule(media_action_url, endpoint, view_func=view, methods=['GET'])
-                    # item_file_preview
-                    media = field.name.lower()
-                    endpoint = '|item_file_preview' + '|' + name + '|' + media
-                    media_action_url = '%s/<%s:%s>/%s/preview' % (url, item_id_format, 'id', media)
-                    self._add_url_rule(media_action_url, endpoint, view_func=view, methods=['GET'])
         elif view.model and issubclass(view.model, GraphDocument):
             # graph doc
             logger.debug('load route for graph view %s', name)
@@ -710,8 +541,6 @@ class Adam(Flask):
         as the request method, so normal routing and method validation can be
         performed.
         """
-        if self.config['ALLOW_OVERRIDE_HTTP_METHOD']:
-            environ['REQUEST_METHOD'] = environ.get(
-                'HTTP_X_HTTP_METHOD_OVERRIDE',
-                environ['REQUEST_METHOD']).upper()
+        if self.config.get('ALLOW_OVERRIDE_HTTP_METHOD', True):
+            environ['REQUEST_METHOD'] = environ.get('HTTP_X_HTTP_METHOD_OVERRIDE', environ.get('REQUEST_METHOD')).upper()
         return super().__call__(environ, start_response)

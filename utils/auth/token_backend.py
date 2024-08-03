@@ -15,7 +15,7 @@ from flask import request, current_app as app, abort
 import jwt
 from .basic_backend import BasicBackend
 
-logger = logging.getLogger('utils.auth.TokenBackend')
+logger = logging.getLogger(__name__)
 _env = os.environ.get('ENV') or 'development'
 
 
