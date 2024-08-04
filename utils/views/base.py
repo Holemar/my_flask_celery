@@ -297,8 +297,6 @@ class ResourceView(object):
             traceback.print_exc()
             if _env != 'production':
                 callstack = traceback.format_exc().splitlines()
-            # Notification
-            app.error_service.notify(request, ex)
 
         error = return_data(code=code, message=message, detail=detail, callstack=callstack)
         logger.error(error)
