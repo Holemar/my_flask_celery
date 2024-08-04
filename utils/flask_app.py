@@ -40,9 +40,9 @@ class Adam(Flask):
     #: Allowed methods for item endpoints
     supported_item_methods = ['GET', 'PATCH', 'DELETE', 'PUT']
 
-    def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks',
-                 enable_celery=False, static_folder='static', template_folder='templates',
-                 url_converters=None, model_path='models', view_path='views', **kwargs):
+    def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks', model_path='models',
+                 enable_celery=False, static_folder='static', template_folder='templates', view_path='views',
+                 url_converters=None, middleware_path='utils/middlewares', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
         we need to enhance our super-class a little bit.
@@ -54,7 +54,7 @@ class Adam(Flask):
         self.current_file_dir = os.path.abspath(cur_dir)
         self.root = root or os.getcwd()  # 当前目录
 
-        middleware_path = 'middlewares'
+
         if root:
             # 引入项目根目录以及lib跟目录
             sys.path.append(".")
