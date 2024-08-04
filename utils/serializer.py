@@ -26,7 +26,7 @@ def serialize(_root, obj, field_obj, depth=1, included=None, excluded=None):
     if obj is None:
         return result
 
-    if isinstance(obj, list):
+    if isinstance(obj, (list, tuple, set)):
         result = []
         for item in obj:
             result.append(serialize(_root, item, None, depth, included=included, excluded=excluded))

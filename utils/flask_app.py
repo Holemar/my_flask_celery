@@ -10,7 +10,6 @@
 """
 import os
 import sys
-import fnmatch
 import logging
 import importlib
 import inspect
@@ -190,7 +189,7 @@ class Adam(Flask):
             # import bello_adam.views.user as BaseUser
             views = list(filter(lambda x: x[0] == x[1].__name__, views))
             if not views:
-                break
+                continue
             name = views[0][0]
             resource = name
             cls_view = views[0][1]
@@ -208,7 +207,6 @@ class Adam(Flask):
                 acl = cls_parent.acl + cls_view.acl
                 bp = inspect.getmembers(sys.modules[cls_parent.__module__], lookup_bp)
                 if bp:
-                    # {'item': {}, 'collection': {}, 'remote_item': {}}
                     routes = {
                         'item': {**routes['item'], **bp[0][1].routes['item']},
                         'collection': {**routes['collection'], **bp[0][1].routes['collection']},

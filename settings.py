@@ -44,3 +44,8 @@ MONGO_CONNECTIONS = {
     # 'broker': CELERY_CONFIG.broker_url,  # 如果使用 mongodb 作为中间件，则需要配置这里
     # 'result_backend': CELERY_CONFIG.result_backend
 }
+
+
+# API
+JWT_SECRET = os.environ.get('JWT_SECRET', 'befxjbubeg0lacoazvorsokhuofadav1')
+JWT_EXPIRES = 24

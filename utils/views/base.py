@@ -22,32 +22,17 @@ from flask import current_app as app
 from bson import ObjectId
 from mongoengine.queryset.visitor import Q
 from mongoengine.fields import LazyReferenceField, ReferenceField
-from werkzeug.exceptions import NotFound, Unauthorized, HTTPException, Forbidden, BadRequest
+from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
 
 from utils.documents import CommonException, BussinessCommonException
 from utils.serializer import serialize, dict_to_mongo, mongo_to_dict
 from utils.fields import RelationField
 from utils.url_util import parse_request, payload
 from utils.documents.base import IDocument
+from .blueprint import return_data
 
 logger = logging.getLogger(__name__)
 _env = os.environ.get('ENV') or 'development'
-SUCCESS_CODE = int(os.environ.get('SUCCESS_CODE', 200))  # 成功的返回码
-SUCCESS_MESSAGE = os.environ.get('SUCCESS_MESSAGE', 'success')  # 成功的返回值
-
-
-def return_data(code=None, message=None, data=None, **kwargs):
-    """
-    响应数据
-    """
-    result = {
-        'code': code or SUCCESS_CODE,
-        'message': message or SUCCESS_MESSAGE,
-        **kwargs
-    }
-    if data is not None:
-        result['data'] = data
-    return result
 
 
 class ResourceView(object):
@@ -287,6 +272,9 @@ class ResourceView(object):
         included = None
         if hasattr(request, 'req'):
             included = request.req.included or []
+        # 强行封装成统一格式
+        if isinstance(obj, dict) and 'code' not in obj:
+            obj = return_data(data=obj)
         response = serialize('_root', obj, None, included=included)
         ua = request.headers.get('User-Agent')
         # ugly fix for IE
