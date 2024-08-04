@@ -78,7 +78,7 @@ def load_task_schedule(path):
         for r_task in rules:
             name = r_task.pop('name')
             task = r_task.pop('task')
-            cron = parse_cron(r_task['cron'])
+            cron = parse_cron(r_task.pop('cron'))
             schedule[name] = r_task  # 保留原始配置(允许配置更多参数)
             schedule[name]['task'] = task
             schedule[name]['schedule'] = cron

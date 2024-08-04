@@ -11,9 +11,6 @@ from mongoengine.fields import DateTimeField
 
 from utils.config_util import config
 
-# RFC 1123 (ex RFC 822)
-DATE_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
-RFC1123_DATE_FORMAT = '%a, %d %b %Y %H:%M:%S GMT'
 
 _operators = [
     'not__exists' 'exists', 'gte', 'lte', 'ne', 'gt', 'in', 'nin', 'icontains', 'contains',
@@ -113,7 +110,7 @@ def weak_date(date):
 
     :param date: the date to be adjusted.
     """
-    return datetime.strptime(date, RFC1123_DATE_FORMAT) + timedelta(seconds=1) if date else None
+    return datetime.strptime(date, config.RFC1123_DATE_FORMAT) + timedelta(seconds=1) if date else None
 
 
 def multidict_to_dict(multidict):

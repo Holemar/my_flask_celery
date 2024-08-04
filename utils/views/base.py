@@ -28,7 +28,7 @@ from utils.documents import CommonException, BussinessCommonException
 from utils.serializer import serialize, dict_to_mongo, mongo_to_dict
 from utils.fields import RelationField
 from utils.url_util import parse_request, payload
-from .documents.base import IDocument
+from utils.documents.base import IDocument
 
 logger = logging.getLogger(__name__)
 _env = os.environ.get('ENV') or 'development'

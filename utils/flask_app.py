@@ -22,11 +22,10 @@ from mongoengine import register_connection
 from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
 from utils import celery_util
-from utils.blueprint import Blueprint
 from utils.import_util import import_submodules, discovery_items_in_package
 from utils.url_util import RegexConverter, underscore
 from utils.log_filter import WerkzeugLogFilter
-from utils.view import ResourceView
+from utils.views import ResourceView, Blueprint
 from utils.documents import ResourceDocument
 from utils.fields import RelationField
 from utils.middlewares import Middleware
@@ -42,7 +41,7 @@ class Adam(Flask):
     #: Allowed methods for item endpoints
     supported_item_methods = ['GET', 'PATCH', 'DELETE', 'PUT']
 
-    def __init__(self, import_name=__package__, root='', settings='settings.py', task_path='tasks',
+    def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks',
                  enable_celery=False, static_folder='static', template_folder='templates',
                  url_converters=None, model_path='models', view_path='views', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
@@ -55,9 +54,6 @@ class Adam(Flask):
         logger.info('Init Adam2')
         self.current_file_dir = os.path.abspath(cur_dir)
         self.root = root or os.getcwd()  # 当前目录
-        if isinstance(settings, str):
-            settings = os.path.abspath(os.path.join(self.root, settings))
-            logger.info('use setting %s', settings)
 
         middleware_path = 'middlewares'
         if root:
@@ -72,9 +68,8 @@ class Adam(Flask):
         kwargs['static_folder'] = static_folder
 
         super().__init__(import_name, **kwargs)
-        # self.validator = validator
-        self.settings = settings
 
+        self.settings = settings
         self.load_config()
 
         # name
@@ -121,7 +116,7 @@ class Adam(Flask):
                 logger.error('unregistered middleware %s', middleware)
 
         self.auth_backends = []
-        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['utils.auth.TokenBackend']:
+        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['utils.auth.token_backend']:
             auth_module = importlib.import_module(ab)
             is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
             clsmembers = inspect.getmembers(auth_module, is_class_member)
@@ -129,14 +124,14 @@ class Adam(Flask):
 
         if enable_celery:
             self.celery = celery.Celery(self.name)
-            self.celery.config_from_object(self.config.get('CeleryConfig'))
+            self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
 
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
             celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['worker', 'beat'])
+        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor'])
         parser.add_argument('-p', '--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
@@ -195,7 +190,7 @@ class Adam(Flask):
             # import bello_adam.views.user as BaseUser
             views = list(filter(lambda x: x[0] == x[1].__name__, views))
             if not views:
-                raise SystemError('Missing View ' + module.__name__)
+                break
             name = views[0][0]
             resource = name
             cls_view = views[0][1]
@@ -283,38 +278,34 @@ class Adam(Flask):
         Since we are a Flask subclass, any configuration value supported by
         Flask itself is available (besides Adam's proper settings).
         """
+        self.config.from_object('utils.default_settings')
+
         # overwrite the defaults with custom user settings
         if isinstance(self.settings, dict):
             self.config.update(self.settings)
-        else:
-            if os.path.isabs(self.settings):
-                pyfile = self.settings
-            else:
-                def find_settings_file(file_name):
-                    # check if we can locate the file from sys.argv[0]
-                    abspath = os.path.abspath(os.path.dirname(sys.argv[0]))
-                    settings_file = os.path.join(abspath, file_name)
-                    if os.path.isfile(settings_file):
-                        return settings_file
-                    else:
-                        # try to find settings.py in one of the
-                        # paths in sys.path
-                        for p in sys.path:
-                            for root, dirs, files in os.walk(p):
-                                for f in fnmatch.filter(files, file_name):
-                                    if os.path.isfile(os.path.join(root, f)):
-                                        return os.path.join(root, file_name)
-
-                # try to load file from environment variable or settings.py
-                pyfile = find_settings_file(os.environ.get('EVE_SETTINGS') or self.settings)
-
-            if not pyfile:
-                raise IOError('Could not load settings.')
-
+        elif isinstance(self.settings, str):
             try:
-                self.config.from_pyfile(pyfile)
-            except:
-                raise
+                settings = __import__(self.settings)
+                for key in dir(settings):
+                    if not key.isupper():
+                        continue
+                    value = getattr(settings, key)
+                    if isinstance(value, (int, float, str, bool, list, tuple)):
+                        self.config[key] = value
+                    elif isinstance(value, dict):
+                        if key in self.config and isinstance(self.config[key], dict):
+                            self.config[key].update(value)
+                        else:
+                            self.config[key] = value
+                    # 是一个类，逐个属性填充
+                    elif type(value).__name__ == 'type':
+                        old_value = self.config.get(key)
+                        for k in dir(value):
+                            if k.startswith('__'):
+                                continue
+                            setattr(old_value, k, getattr(value, k))
+            except ImportError:
+                pass
 
         # flask-pymongo compatibility
         self.config['MONGO_CONNECT'] = self.config['MONGO_OPTIONS'].get('connect', True)
