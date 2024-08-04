@@ -1,14 +1,5 @@
 # -*- coding: utf-8 -*-
 
-"""
-    utils.auth.basic
-    ~~~~~~~~
-
-    Allow API endpoints to be secured via BasicAuth and derivates.
-
-    :copyright: (c) 2024 by Holemar Feng<daillow@gmail.com>.
-"""
-
 from flask import request, Response, current_app as app, g, abort
 
 

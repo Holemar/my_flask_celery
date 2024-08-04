@@ -16,10 +16,10 @@ import importlib
 import inspect
 import argparse
 
-import click
 import celery
 from flask import Flask
 from mongoengine import register_connection
+from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
 from utils import celery_util
 from utils.blueprint import Blueprint
@@ -27,8 +27,9 @@ from utils.import_util import import_submodules, discovery_items_in_package
 from utils.url_util import RegexConverter, underscore
 from utils.log_filter import WerkzeugLogFilter
 from utils.view import ResourceView
-
-from bello_adam import ResourceDocument, GraphDocument, Service, Middleware
+from utils.documents import ResourceDocument
+from utils.fields import RelationField
+from utils.middlewares import Middleware
 
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class Adam(Flask):
 
     def __init__(self, import_name=__package__, root='', settings='settings.py', task_path='tasks',
                  enable_celery=False, static_folder='static', template_folder='templates',
-                 url_converters=None, media=None, model_path='models', view_path='views', **kwargs):
+                 url_converters=None, model_path='models', view_path='views', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
         we need to enhance our super-class a little bit.
@@ -58,7 +59,6 @@ class Adam(Flask):
             settings = os.path.abspath(os.path.join(self.root, settings))
             logger.info('use setting %s', settings)
 
-        service_path = 'services'
         middleware_path = 'middlewares'
         if root:
             # 引入项目根目录以及lib跟目录
@@ -66,7 +66,6 @@ class Adam(Flask):
             sys.path.append("./" + root)
             model_path = root + '/models'
             view_path = root + '/views'
-            service_path = root + '/services'
             middleware_path = root + '/middlewares'
 
         kwargs['template_folder'] = template_folder
@@ -94,7 +93,6 @@ class Adam(Flask):
 
         self.views = {}
         self.models = {}
-        self.services = {}
         self.middlewares = {}
         self.tasks = {}
 
@@ -106,7 +104,6 @@ class Adam(Flask):
 
         load_middlewares = [
             'TokenMiddleware',
-            'RateLimitMiddleware',
             'CorsMiddleware'
         ]
         for oth_midd in self.config.get('MIDDLEWARS', []):
@@ -123,11 +120,6 @@ class Adam(Flask):
             else:
                 logger.error('unregistered middleware %s', middleware)
 
-        self.media = media(self) if media else None
-
-        self.load_service(service_path)
-        self.load_build_in_commands()
-
         self.auth_backends = []
         for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['utils.auth.TokenBackend']:
             auth_module = importlib.import_module(ab)
@@ -141,20 +133,6 @@ class Adam(Flask):
 
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
             celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
-
-        for k, s in self.services.items():
-            logger.debug('service on_loaded trigger %s', k)
-            s.on_loaded()
-
-    def load_build_in_commands(self):
-        """
-        Load all build-in commands
-        """
-        commands = discovery_items_in_package(
-            'bello_adam.commands', lambda x: isinstance(x, click.core.Command))
-        for _k, _c in commands:
-            logger.debug('Load command: %s', _k)
-            self.cli.add_command(_c)
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
@@ -281,7 +259,7 @@ class Adam(Flask):
 
     def load_middleware(self, path):
         """
-        load all services
+        load all middleware
         """
         all_middlewares = []
         func_lookup = lambda x: inspect.isclass(x) and x != Middleware and issubclass(x, Middleware)
@@ -295,28 +273,6 @@ class Adam(Flask):
         for _k, _m in all_middlewares:
             logger.debug('Load middleware: %s', _k)
             self.middlewares[_k] = _m
-
-    def load_service(self, path):
-        """
-        load all services
-        """
-        all_services = []
-
-        if os.path.exists(path):
-            package_name = path.replace('/', '.')
-            package = importlib.import_module(package_name)
-            customize_services = discovery_items_in_package(package, lambda x: inspect.isclass(
-                x) and x != Service and issubclass(x, Service))
-            all_services = all_services + customize_services
-
-        for _k, _m in all_services:
-            name = _k.lower()
-            _index = name.rindex('service')
-            service_name = name[:_index] + '_' + name[_index:]
-            service = _m(self)
-            self.__setattr__(service_name, service)
-            logger.debug('Load service: %s', service_name)
-            self.services[service_name] = service
 
     def load_config(self):
         """ API settings are loaded from standard python modules. First from
@@ -382,12 +338,6 @@ class Adam(Flask):
     def _add_resource_url_rules(self, name, view, routes=None):
         """ Builds the API url map for one resource. Methods are enabled for
         each mapped endpoint, as configured in the settings.
-
-        .. versionchanged:: 0.5
-           Don't add resource to url rules if it's flagged as internal.
-           Strip regexes out of config.URLS helper. Closes #466.
-
-        .. versionadded:: 0.2
         """
         name = underscore(name)
         view.__name__ = name
@@ -436,7 +386,7 @@ class Adam(Flask):
                     action_url = url + '/batch'
                     self._add_url_rule(action_url, endpoint, view_func=view, methods=method['methods'])
 
-            if view.model._meta.get('index'):
+            if model._meta.get('index'):
                 for action, method in view.query_methods.items():
                     if 'collection' in action:
                         action_url = '%s/%s/%s' % (self.api_prefix, name, method['url'])
@@ -475,21 +425,6 @@ class Adam(Flask):
                         if method.get('url'):
                             relation_action_url = relation_action_url + '/' + method['url']
                         self._add_url_rule(relation_action_url, endpoint, view_func=view, methods=method['methods'])
-        elif view.model and issubclass(view.model, GraphDocument):
-            # graph doc
-            logger.debug('load route for graph view %s', name)
-            for action, method in view.graph_methods.items():
-                endpoint = '|' + action + '|' + name + '|'
-                action_url = '%s/<%s:%s>' % (url, item_id_format, 'id')
-                if 'collection' in action:
-                    action_url = url
-                    if method.get('url'):
-                        action_url = action_url + '/' + method['url']
-                    self._add_url_rule(action_url, endpoint, view_func=view, methods=method['methods'])
-                elif 'item' in action:
-                    if method.get('url'):
-                        action_url = action_url + '/' + method['url']
-                    self._add_url_rule(action_url, endpoint, view_func=view, methods=method['methods'])
 
         # bp endpoint
         if routes:

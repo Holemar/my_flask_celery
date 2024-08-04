@@ -1,14 +1,5 @@
 # -*- coding: utf-8 -*-
 
-"""
-    utils.auth.token
-    ~~~~~~~~
-
-    Allow API endpoints to be secured via BasicAuth and derivates.
-
-    :copyright: (c) 2024 by Holemar Feng<daillow@gmail.com>.
-"""
-
 import os
 import logging
 from flask import request, current_app as app, abort
@@ -76,7 +67,6 @@ class TokenBackend(BasicBackend):
                 abort(401, description='Invalid jwt token')
 
         return credential
-
 
     def authenticate(self, credential, allowed_roles, resource, method):
         """ This function is called to check if a token is valid. Must be

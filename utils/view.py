@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-View Class
+View Base Class
 """
 import re
 import os
@@ -10,8 +10,6 @@ import copy
 import logging
 import traceback
 import requests
-from operator import attrgetter
-from itertools import groupby
 from io import StringIO
 from io import BytesIO
 import zipfile
@@ -26,23 +24,30 @@ from mongoengine.queryset.visitor import Q
 from mongoengine.fields import LazyReferenceField, ReferenceField
 from werkzeug.exceptions import NotFound, Unauthorized, HTTPException, Forbidden, BadRequest
 
-from bello_adam.exceptions import CommonException, BussinessCommonException
-from bello_adam.serializer import serialize, dict_to_mongo, mongo_to_dict
-# from bello_adam.distributed_tracing import trace
-from bello_adam.io.fields import RelationField
-from .utils import parse_request, payload
-from elasticsearch_dsl import Q as ESQ
+from utils.documents import CommonException, BussinessCommonException
+from utils.serializer import serialize, dict_to_mongo, mongo_to_dict
+from utils.fields import RelationField
+from utils.url_util import parse_request, payload
 from .documents.base import IDocument
-from opentracing_instrumentation.request_context import get_current_span
-import bello_jmespath
-from bello_adam.helper.format import SuperFormatter
-from bello_adam.utils import get_access_from_request
-from bello_adam.helper.decorator_util import condition_span_trace
 
 logger = logging.getLogger(__name__)
-_enable_profile = os.environ.get('PROFILE') != None
 _env = os.environ.get('ENV') or 'development'
-JAEGER_AGENT_HOST = os.environ.get('JAEGER_AGENT_HOST')
+SUCCESS_CODE = int(os.environ.get('SUCCESS_CODE', 200))  # 成功的返回码
+SUCCESS_MESSAGE = os.environ.get('SUCCESS_MESSAGE', 'success')  # 成功的返回值
+
+
+def return_data(code=None, message=None, data=None, **kwargs):
+    """
+    响应数据
+    """
+    result = {
+        'code': code or SUCCESS_CODE,
+        'message': message or SUCCESS_MESSAGE,
+        **kwargs
+    }
+    if data is not None:
+        result['data'] = data
+    return result
 
 
 class ResourceView(object):
@@ -69,7 +74,6 @@ class ResourceView(object):
         'collection_create': {'methods': ['POST']},
         'collection_count': {'methods': ['GET'], 'url': 'count'},
         'collection_read': {'methods': ['GET']},
-        'collection_read_random': {'methods': ['GET'], 'url': 'random'},
         'collection_import': {'methods': ['POST'], 'url': 'import'},
         'item_read': {'methods': ['GET']},
         'item_update': {'methods': ['PUT']},
@@ -96,33 +100,6 @@ class ResourceView(object):
         'item_relation_read': {'methods': ['GET']}
     }
 
-    query_methods = {
-        'item_sync': {
-            'methods': ['POST'],
-            'url': 'sync'
-        },
-        'collection_sync': {
-            'methods': ['POST'],
-            'url': 'sync'
-        },
-        'collection_query': {
-            'methods': ['GET'],
-            'url': 'query'
-        }
-    }
-
-    graph_methods = {
-        'collection_import': {'methods': ['POST'], 'url': 'import'},
-        'collection_graph_node_read': {'methods': ['GET']},
-        'collection_graph_node_read_all_between': {'methods': ['GET'], 'url': 'between'},
-        'collection_graph_node_create': {'methods': ['POST']},
-        'item_graph_node_connect': {'methods': ['POST'], 'url': 'connect'},
-        'item_graph_node_update': {'methods': ['PUT']},
-        'item_graph_node_delete': {'methods': ['DELETE']},
-        'item_graph_node_import': {'methods': ['POST'], 'url': 'import'},
-        'item_graph_node_expand': {'methods': ['POST'], 'url': 'expand'}
-    }
-
     def __init__(self, app, model, routes):
         self.model = model
         self.name = ''
@@ -130,9 +107,6 @@ class ResourceView(object):
             self.name = model.__name__.lower()
         self.app = app
         self.routes = routes
-        if _enable_profile:
-            import cProfile
-            self.pr = cProfile.Profile()
 
     def __call__(self, *args, **kwargs):
         """
@@ -153,10 +127,6 @@ class ResourceView(object):
             middleware2 after
             middleware1 after
         """
-
-        if _enable_profile:
-            self.pr.enable()
-
         reserved_middlewares = list(reversed(self.app.available_middlewares))
 
         # pre process request
@@ -173,11 +143,6 @@ class ResourceView(object):
             result = current()
         except Exception as ex:
             result = self.render_error(400, str(ex), ex)
-
-        if _enable_profile:
-            self.pr.disable()
-            self.pr.print_stats()
-
         return result
 
     def _patch_where(self):
@@ -192,13 +157,11 @@ class ResourceView(object):
         if items and isinstance(items[0], IDocument):
             for item in items:
                 for field in included_fields:
-                    if field in self.model._fields and item[field] and \
-                            isinstance(self.model._fields[field], LazyReferenceField):
+                    if field in self.model._fields and item[field] and isinstance(self.model._fields[field], LazyReferenceField):
                         try:
                             item[field] = item[field].fetch()
                         except item[field].document_type.DoesNotExist:
-                            logger.warning(
-                                f'reference doesnot exist: {field}:{item[field].pk} in model {self.model.__name__}')
+                            logger.warning(f'reference doesnot exist: {field}:{item[field].pk} in model {self.model.__name__}')
                             item[field] = None
         elif items and isinstance(items[0], dict):
             id_map_index = {ObjectId(item['id']): index for index, item in enumerate(items)}
@@ -208,7 +171,6 @@ class ResourceView(object):
                 if not orm_field:
                     continue
                 if isinstance(orm_field, RelationField):
-                    # TODO: 即使是 has one 也是返回 [] 结构
                     for item in items:
                         item[field] = []
                     target_field = orm_field.target_field
@@ -292,14 +254,9 @@ class ResourceView(object):
                                 raise NotFound
                             kwargs['instance'] = instance
                             del kwargs['id']
-                    # if not self.has_permission(action, endpoint, instance):
-                    if not self.has_access(endpoint, instance) and not app.config.get('DEBUG'):
+                    if not self.has_permission(action, endpoint, instance) and not app.config.get('DEBUG'):
                         raise Forbidden
                     function = getattr(self, handler)
-                    # if JAEGER_AGENT_HOST:
-                    #     op_name = op_name = re.sub('(<|bound |method |of |function |object |at 0x\w+|>)',
-                    #                                '', str(function)).strip()
-                    #     get_current_span().set_operation_name(op_name)
                     response = function(**kwargs)
                 else:
                     raise NotFound
@@ -323,7 +280,7 @@ class ResourceView(object):
         except CommonException as ex:
             return self.render_error(ex.code, ex.message)
         except Exception as ex:
-            logger.error(ex) # render_error 里会单独打印call stack,这里就不用exception了,
+            logger.error(ex)  # render_error 里会单独打印call stack,这里就不用exception了,
             return self.render_error(400, '未知错误', ex)
 
     def render_obj(self, obj):
@@ -355,15 +312,7 @@ class ResourceView(object):
             # Notification
             app.error_service.notify(request, ex)
 
-        error = {
-            'error': {
-                'code': code,
-                'message': message,
-                'detail': detail,
-                'callstack': callstack
-            }
-        }
-
+        error = return_data(code=code, message=message, detail=detail, callstack=callstack)
         logger.error(error)
 
         ua = request.headers.get('User-Agent')
@@ -371,9 +320,9 @@ class ResourceView(object):
         mimetype = 'text/html' if re.search(r'MSIE\s[6-9]', ua) else 'application/json'
         return Response(json.dumps(error), status=code, mimetype=mimetype)
 
-    @condition_span_trace(os.environ.get('ELASTIC_APM_SERVER_URL'))
-    def has_access(self, endpoint, instance=None):
+    def has_permission(self, action, endpoint, instance=None):
         """
+        权限判断
         endpoint: $create, $read, $updaet, $delete, other_action
         allow: True/False
             {
@@ -381,49 +330,16 @@ class ResourceView(object):
                 'allow': True
             }
         """
+        # TODO: 权限判断
         user = getattr(request, 'user', None)
         _, action, _, _ = request.endpoint.split('|')
-        rows = get_access_from_request()
-        results = []
-        for row in rows:
-            scope = row.get('scope')
-            allow = row['allow']
-            if action.startswith('item_'):
-                if scope == 'company':
-                    if user and instance:
-                        resource_company = None
-                        if instance._class_name == 'Company' or instance.__class__.__bases__[0].__name__ == 'Company':
-                            resource_company = instance
-                        elif hasattr(instance, 'owned_company'):
-                            resource_company = instance.owned_company
-                        elif hasattr(instance, 'user'):
-                            resource_company = app.models['User'].objects(id=instance.user.id).first().owned_company
-                        if request.user.owned_company == resource_company:
-                            results.append(allow)
-                elif scope == 'owner' or scope == 'company':
-                    if user and instance:
-                        resource_user_id = None
-                        if instance._class_name == 'User' or instance.__class__.__bases__[0].__name__ == 'User':
-                            resource_user_id = instance.id
-                        elif instance.user:
-                            resource_user_id = instance.user.id
-                        if request.user.id == resource_user_id:
-                            results.append(allow)
-                else:
-                    results.append(allow)
-            else:
-                results.append(allow)
-
-        if True in results and False not in results:
-            return True
-        else:
-            return False
+        return True
 
     def options(self):
         """
         HTTP OPTIONS handler
         """
-        return {}
+        return return_data()
 
     def fetch_remote_response(self, target_resource, method, data=None, args=None):
         source = self.meta.get('name')
@@ -467,8 +383,7 @@ class ResourceView(object):
             text = ','.join(header) + '\n'
         for item in data:
             text = text + ','.join(item) + '\n'
-        response = Response(text, headers=headers, mimetype='plain/text',
-                            direct_passthrough=True)
+        response = Response(text, headers=headers, mimetype='plain/text', direct_passthrough=True)
         return response
 
     def collection_download_to_json_zip(self, items, prefix=''):
@@ -488,8 +403,7 @@ class ResourceView(object):
             zip_archive.writestr(str(item.id) + '.json', fb.getvalue())
 
         zip_archive.close()
-        response = Response(buff.getvalue(), headers=headers, mimetype='application/zip',
-                            direct_passthrough=True)
+        response = Response(buff.getvalue(), headers=headers, mimetype='application/zip', direct_passthrough=True)
         return response
 
     def collection_import(self):
@@ -499,71 +413,21 @@ class ResourceView(object):
         """
         data = request.get_json() or {}
         items = self.model.import_csv(data)
-        return {
-            'items': items
-        }
-
-    def collection_query(self):
-        """
-        collection query endpoint GET
-        """
-        self._patch_where()
-        response = {}
-        # meta-hidden
-        hidden = self.model._meta.get('hidden', [])
-        protected = self.model._meta.get('protected', [])
-        exclude_fields = hidden + protected
-
-        exclude_fields = list(filter(lambda x: x in self.model._fields, exclude_fields))
-
-        if not self.model._meta.get('index'):
-            abort(400, 'Resource not allowed to query')
-        indexer = None
-
-        # Launch query
-        response = app.indexer.find(self.model, request.req, [])
-
-        # build items
-        return {
-            'items': response['items'],
-            'meta': {
-                'page': request.req.page,
-                'max_results': request.req.max_results,
-                'total': response['total']
-            }
-        }
+        return return_data(items=items)
 
     def collection_count(self):
         """
         collection count endpoint GET
         """
         self._patch_where()
-        response = {}
         by = request.req.by
 
         # meta-hidden
         hidden = self.model._meta.get('hidden', [])
         protected = self.model._meta.get('protected', [])
         exclude_fields = hidden + protected
-        exclude_fields = list(filter(lambda x: x in self.model._fields, exclude_fields))
 
-        user = request.user if hasattr(request, 'user') else None
-        owned_company = request.owned_company if hasattr(request, 'owned_company') else None
-        rows = get_access_from_request()
-        scope = [row.get('scope', None) for row in rows]
-        queryset = None
-        if None in scope:
-            queryset = self.model.objects()
-        elif 'company' in scope and self.model._fields.get('owned_company') and owned_company:
-            queryset = self.model.objects().by_company(owned_company)
-        elif 'company' in scope and app.models['Company']._meta['collection'] == 'company':
-            queryset = self.model.objects(id=owned_company.id)
-        elif 'company' in scope and not self.model._fields.get('owned_company') and self.model._fields.get('user') and user:
-            queryset = self.model.objects().by_own(user)
-        elif 'owner' in scope and self.model._fields.get('user') and user:
-            queryset = self.model.objects().by_own(user)
-        else:
-            queryset = self.model.objects()
+        queryset = self.model.objects()
 
         items = []
         count = queryset.filter(**request.req.where).count()
@@ -587,40 +451,12 @@ class ResourceView(object):
             items = list(queryset.aggregate(*pipeline))
 
         # build items
-        return {
-            'items': items,
-            'meta': {
-                'total': count
-            }
-        }
-
-    def collection_read_random(self):
-        # meta-hidden
-        hidden = self.model._meta.get('hidden', [])
-        protected = self.model._meta.get('protected', [])
-
-        if not self.model._meta.get('index'):
-            abort(400, 'Resource not allowed to random')
-        indexer = None
-
-        # Launch query
-        response = app.indexer.findByRandom(self.model, request.req)
-
-        # build items
-        return {
-            'items': response['items'],
-            'meta': {
-                'page': request.req.page,
-                'max_results': request.req.max_results,
-                'total': response['total']
-            }
-        }
+        return return_data(items=items, meta={'total': count})
 
     def collection_read(self):
         """
         collection endpoint GET
         """
-        response = {}
         all_conditions = []
         limit = int(request.req.max_results or 25)  # 每页显示多少行
         page = int(request.req.page or 1)  # 第几页
@@ -639,37 +475,9 @@ class ResourceView(object):
         if only_fields:
             exclude_fields = list(set(self.model._fields.keys() - set(only_fields + ['id'])))
 
-        # exclude_fields = list(filter(lambda x: x in self.model._fields, exclude_fields))
         search_fields = list(filter(lambda x: x in self.model._fields, search_fields))
 
-        user = request.user if hasattr(request, 'user') else None
-        owned_company = request.owned_company if hasattr(request, 'owned_company') else None
-        rows = get_access_from_request()
-        if rows:
-            scope = [row.get('scope', None) for row in rows]
-        else:
-            scope = []
-        queryset = None
-        if None in scope:
-            queryset = self.model.objects()
-        elif 'company' in scope and self.model._fields.get('owned_company') and owned_company:
-            companies = [str(owned_company.id)]
-            queryset = self.model.objects().by_companies(companies, self.model._meta.get('share_filter'))
-            all_conditions.append(ESQ('bool', should=list(map(lambda x: ESQ('match', owned_company=x), companies))))
-        elif 'company' in scope and app.models['Company']._meta['collection'] == 'company':
-            companies = []
-            queryset = self.model.objects(id=owned_company.id)
-            all_conditions.append(ESQ('bool', should=list(map(lambda x: ESQ('match', owned_company=x), companies))))
-        elif 'company' in scope and not self.model._fields.get('owned_company') and self.model._fields.get('user') and user:
-            users = [str(user.id)]
-            all_conditions.append(ESQ('bool', should=list(map(lambda x: ESQ('match', user=x), users))))
-            queryset = self.model.objects().by_users(users, self.model._meta.get('share_filter'))
-        elif 'owner' in scope and self.model._fields.get('user') and user:
-            users = [str(user.id)]
-            all_conditions.append(ESQ('bool', should=list(map(lambda x: ESQ('match', user=x), users))))
-            queryset = self.model.objects().by_users(users, self.model._meta.get('share_filter'))
-        else:
-            queryset = self.model.objects()
+        queryset = self.model.objects()
 
         if q:
             _filter = None
@@ -681,51 +489,42 @@ class ResourceView(object):
                 for sf in search_fields[1:]:
                     _filter = _filter | Q(**{sf + '__icontains': q})
             else:
-                logger.warn('Invalid query %s', q)
+                logger.warning('Invalid query %s', q)
             queryset = queryset.filter(_filter)
 
-        if self.model._meta.get('collection_read_src') == 'es':
-            resp = self.app.indexer.find(self.model, request.req, all_conditions, included_fields)
-            count = resp["total"]
-            items = resp["items"]
-        else:
-            req_where = request.req.where
-            req_query = Q(**req_where)
-            external_query_info = getattr(request, "external_query_info") \
-                if hasattr(request, "external_query_info") else None
-            if external_query_info:
-                and_list = external_query_info.get("and")
-                or_list = external_query_info.get("or")
-                if and_list:
-                    for and_q in and_list:
-                        req_query = req_query & and_q
-                if or_list:
-                    for or_q in or_list:
-                        req_query = req_query | or_q
+        req_where = request.req.where
+        req_query = Q(**req_where)
+        external_query_info = getattr(request, "external_query_info") \
+            if hasattr(request, "external_query_info") else None
+        if external_query_info:
+            and_list = external_query_info.get("and")
+            or_list = external_query_info.get("or")
+            if and_list:
+                for and_q in and_list:
+                    req_query = req_query & and_q
+            if or_list:
+                for or_q in or_list:
+                    req_query = req_query | or_q
 
-            count = queryset.filter(req_query).count()  # 总数
-            # 页码防呆
-            max_page = int((count + limit - 1) // limit)  # 最大页码
-            page = max_page if page > max_page else page
-            page = 1 if page < 1 else page
-            skip = (page - 1) * limit
-            # 取数据
-            items = queryset.filter(req_query).exclude(*exclude_fields).order_by(*sort).limit(limit).skip(skip)
+        count = queryset.filter(req_query).count()  # 总数
+        # 页码防呆
+        max_page = int((count + limit - 1) // limit)  # 最大页码
+        page = max_page if page > max_page else page
+        page = 1 if page < 1 else page
+        skip = (page - 1) * limit
+        # 取数据
+        items = queryset.filter(req_query).exclude(*exclude_fields).order_by(*sort).limit(limit).skip(skip)
 
         # items = list(items)
         items = items if isinstance(items, list) else list(items)
         self._patch_included(items, included_fields)
 
         # build items
-        response = {
-            'items': items,
-            'meta': {
-                'page': page,
-                'max_results': limit,
-                'total': count
-            }
-        }
-        return response
+        return return_data(items=items, meta={
+            'page': page,
+            'max_results': limit,
+            'total': count
+        })
 
     def _before_collection_create(self):
         pass
@@ -756,148 +555,10 @@ class ResourceView(object):
                     instance[k] = o
 
         user = request.user if hasattr(request, 'user') else None
-        owned_company = request.owned_company if hasattr(request, 'owned_company') else None
         if user and self.model._fields.get('user') and not create_data.get('user'):
             instance.user = request.user
-        if owned_company and self.model._fields.get('owned_company') and not create_data.get('owned_company'):
-            instance.owned_company = request.owned_company
         instance.save()
-        return instance
-
-    def collection_graph_node_create(self):
-        """
-        collection graph endpoint POST
-        """
-        data = payload()
-        instance = self.model(**data)
-        instance.save()
-        return instance
-
-    def item_graph_node_delete(self, instance):
-        return instance.delete()
-
-    def item_graph_node_update(self, instance):
-        data = payload()
-        for k, v in data.items():
-            setattr(instance, k, v)
-        instance.save()
-        return instance
-
-    def item_graph_node_import(self, instance):
-        data = payload()
-        relation = data.get('relation')
-        target = data.get('target')
-
-        if not target or not relation:
-            abort(400, 'Invalid Parameter')
-
-        target_class = target.capitalize()
-        rel_map = self.model.get_relations_map()
-        if target_class not in rel_map or relation not in rel_map[target_class]:
-            abort(400, 'Invalid Parameter (relation not exist)')
-
-        rel_field = rel_map[target_class][relation]['field']
-        target_model = self.app.models.get(target_class)
-        if not getattr(self.model, rel_field) or not target_model:
-            abort(400, 'Invalid Parameter')
-
-        items = target_model.import_csv(data)
-        for item in items:
-            status = getattr(instance, rel_field).connect(item)
-        return {
-            'items': items
-        }
-
-
-    def item_graph_node_connect(self, instance):
-        data = payload()
-        targets = data.get('targets') or []
-        relation = data.get('relation')
-
-        if not targets or not relation or not hasattr(instance, relation):
-            abort(400, 'Invalid Parameter')
-
-        node_relation = getattr(self.model, relation)
-        target_model = node_relation.definition['node_class']
-
-        result = []
-        for target in targets:
-            target_node = target_model.find_one_by_id(target)
-            if not target_node:
-                result.append({'id': target, 'status': False, 'reason': 'not exist'})
-            else:
-                status = getattr(instance, relation).connect(target_node)
-                result.append({'id': target, 'status': status, 'reason': ''})
-        return result
-
-    def item_graph_node_expand(self, instance):
-        included = request.req.included
-        ref_nodes, ref_rels = self.model.find_references_by_ids([instance.id], included)
-        rel_nodes, rel_rels = self.model.find_relations_by_ids([instance.id], included)
-        return {
-            'nodes': ref_nodes + rel_nodes,
-            'edges': ref_rels + rel_rels
-        }
-
-    def collection_graph_node_read_all_between(self):
-        args = request.args
-        left = args.get('left')
-        right = args.get('right')
-        nodes = []
-        edges = []
-
-        if left and right:
-            nodes, edges = self.model.find_all_between_two(left, right)
-
-        return {
-            'nodes': nodes,
-            'edges': edges
-        }
-
-    def collection_graph_node_read(self):
-        """
-        graph endpoint GET
-        """
-        response = {}
-        limit = request.req.max_results
-        sort = request.req.sort
-        included = request.req.included
-        q = request.req.q
-
-        count = len(self.model.nodes._get(**request.req.where))
-        items = self.model.nodes._get(limit=limit, **request.req.where)
-        items = list(items)
-
-        ids = list(map(lambda x: x.id, items))
-
-        # find_relations_by_ids
-        target_nodes = []
-        all_nodes = items
-        rels = []
-        target_nodes, rels = self.model.find_relations_by_ids(ids, included)
-        all_nodes = all_nodes + target_nodes
-
-        unique_items = []
-        for _, g in groupby(all_nodes, key=attrgetter('id')):
-            g = list(g)
-            unique_items.append(g[0])
-
-        # unique.
-        all_nodes
-        # build items
-        response = {
-            'items': items,
-            'related': {
-                'nodes': unique_items,
-                'edges': rels
-            },
-            'meta': {
-                'page': request.req.page,
-                'max_results': request.req.max_results,
-                'total': count
-            }
-        }
-        return response
+        return return_data(item=instance)
 
     def batch_update(self, instances):
         """
@@ -911,7 +572,7 @@ class ResourceView(object):
                 for k, v in update.items():
                     instance[k] = v
                 instance.save()
-        return instances
+        return return_data(items=instances)
 
     def batch_delete(self, instances):
         """
@@ -919,13 +580,13 @@ class ResourceView(object):
         """
         for instance in instances:
             instance.delete()
-        return {'deleted': True}
+        return return_data(deleted=True)
 
     def item_read(self, instance):
         """
         item endpoint GET
         """
-        return instance
+        return return_data(item=instance)
 
     def item_embedded_list_create(self, instance):
         """
@@ -937,7 +598,7 @@ class ResourceView(object):
         embedded_instance = embedded_field.document_type(**data)
         instance[embedded].append(embedded_instance)
         instance.save()
-        return instance
+        return return_data(item=instance)
 
     def item_embedded_list_delete(self, instance, index):
         """
@@ -951,7 +612,7 @@ class ResourceView(object):
         instance.save()
         del instance[embedded][index]
         instance.save()
-        return instance
+        return return_data(item=instance)
 
     def item_embedded_list_update(self, instance, index):
         """
@@ -966,7 +627,7 @@ class ResourceView(object):
         update = embedded_field.document_type(**data)
         instance[embedded][index] = update
         instance.save()
-        return instance
+        return return_data(item=instance)
 
     def item_reference_create(self, instance):
         """
@@ -981,12 +642,10 @@ class ResourceView(object):
         reference_instance = reference_field.document_type(**data)
         if hasattr(request, 'user') and self.model._fields.get('user'):
             reference_instance.user = request.user
-        if hasattr(request, 'owned_company') and self.model._fields.get('owned_company'):
-            reference_instance.owned_company = request.owned_company
         reference_instance.save()
         instance[reference] = reference_instance
         instance.save()
-        return instance
+        return return_data(item=instance)
 
     def item_reference_delete(self, instance):
         """
@@ -1002,7 +661,7 @@ class ResourceView(object):
                     reference_instance.delete()
                 instance[reference] = None
         instance.save()
-        return instance
+        return return_data(item=instance)
 
     def item_reference_read(self, instance):
         """
@@ -1016,7 +675,7 @@ class ResourceView(object):
                 return obj
             elif isinstance(reference_field, LazyReferenceField):
                 obj.fetch()
-        return None
+        return return_data()
 
     def item_reference_file(self, instance, field, sub_field):
         """
@@ -1045,8 +704,7 @@ class ResourceView(object):
             headers['ETag'] = response['meta']['ETag']
             headers['Last-Modified'] = response['meta']['Last-Modified']
             data = response['data']
-        response = Response(data, headers=headers, mimetype=file_proxy.content_type,
-                            direct_passthrough=True)
+        response = Response(data, headers=headers, mimetype=file_proxy.content_type, direct_passthrough=True)
         return response
 
     def item_relation_create(self, instance):
@@ -1059,11 +717,9 @@ class ResourceView(object):
         relation_instance = relation_ref.document_type(**data)
         if hasattr(request, 'user') and self.model._fields.get('user'):
             relation_instance.user = request.user
-        if hasattr(request, 'owned_company') and self.model._fields.get('owned_company'):
-            relation_instance.owned_company = request.owned_company
         relation_instance[relation_ref.target_field] = instance
         relation_instance.save()
-        return relation_instance
+        return return_data(item=relation_instance)
 
     def item_relation_count(self, instance):
         """
@@ -1077,17 +733,10 @@ class ResourceView(object):
             items = []
             count = queryset.count()
             if by:
-                pipeline = [
-                    {"$group": {"_id": '$' + by, "count": {"$sum": 1}}}
-                ]
+                pipeline = [{"$group": {"_id": '$' + by, "count": {"$sum": 1}}}]
                 items = list(queryset.aggregate(*pipeline))
-            return {
-                'items': items,
-                'meta': {
-                    'total': count
-                }
-            }
-        return None
+            return return_data(items=items, meta={'total': count})
+        return return_data(code=400, message='Not a valid relation')
 
     def item_relation_read(self, instance):
         """
@@ -1111,15 +760,12 @@ class ResourceView(object):
             skip = (page - 1) * limit
             # 取数据
             items = queryset.order_by(*sort).limit(limit).skip(skip)
-            return {
-                'items': list(items),
-                'meta': {
-                    'page': page,
-                    'max_results': limit,
-                    'total': count
-                }
-            }
-        return None
+            return return_data(items=list(items), meta={
+                'page': page,
+                'max_results': limit,
+                'total': count
+            })
+        return return_data(code=400, message='Not a valid relation')
 
     def item_file_preview(self, instance):
         """
@@ -1172,31 +818,14 @@ class ResourceView(object):
                 instance[k] = v
             instance.save()
             # instance.update(**update)
-        return instance
-
-    def collection_sync(self):
-        """
-        collection endpoint sync
-        """
-        instances = self.model.objects.all()
-        for instance in instances:
-            logger.debug('Syncing instance %s', str(instance.id))
-            instance.apply_index('replace')
-        return {}
-
-    def item_sync(self, instance):
-        """
-        item endpoint sync
-        """
-        instance.apply_index('replace')
-        return {}
+        return return_data(item=instance)
 
     def item_delete(self, instance):
         """
         item endpoint PUT
         """
         instance.delete()
-        return {'deleted': True}
+        return return_data(deleted=True)
 
     def proxy_collection_count(self):
         """

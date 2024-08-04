@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
+import re
+import logging
 import inspect
 import pkgutil
 import importlib
+
+logger = logging.getLogger(__name__)
 
 
 def import_submodules(package, recursive=True):
@@ -35,3 +39,31 @@ def discovery_items_in_package(package, func_lookup=inspect.isfunction):
 
     return functions
 
+
+def parse_csv_content(content, schema):
+    if not content:
+        return []
+    items = content.split('\n')
+    result = []
+    for item in items:
+        item = item.strip()
+        if not item:
+            continue
+        _keys = re.split(r'[,，\t]', item.strip())
+        if _keys:
+            cur_value = {}
+            for (index, field) in enumerate(schema):
+                if index < len(_keys):
+                    _name = field['name']
+                    _type = field['type']
+                    if _type == 'bool':
+                        cur_value[_name] = bool(_keys[index])
+                    elif _type == 'string':
+                        cur_value[_name] = _keys[index]
+                    elif _type == 'array':
+                        sub_val = re.split(r'[;；]', _keys[index])
+                        cur_value[_name] = sub_val
+                    else:
+                        logger.warning('Missing type config %s', _type)
+            result.append(cur_value)
+    return result
