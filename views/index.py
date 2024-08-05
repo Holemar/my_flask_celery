@@ -21,6 +21,7 @@ def status():
     message = {'beat': 'ERROR', 'status': 'ERROR', 'pendMsg': 0, 'version': config.VERSION}
     try:
         data = request.args
+        message['route'] = repr(current_app.url_map)
         # 版本更新时间
         message['update_time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
         message['now'] = time.strftime('%Y-%m-%d %H:%M:%S')  # 系统时间,用来核对系统时间是否正确

@@ -1,9 +1,9 @@
 # -*- coding:utf-8 -*-
-from enum import Enum
 
 from utils.documents import ResourceDocument, CommonException
-from utils.fields import StringField, EmailField, PasswordField, EnumField, BooleanField
-from .common import UserEnum
+from utils.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
+                          RelationField, DictField)
+from .enums import UserEnum
 
 
 class User(ResourceDocument):
@@ -25,8 +25,12 @@ class User(ResourceDocument):
     password = PasswordField()  # 密码
     user_type = EnumField(enum=UserEnum, default=UserEnum.USER)
 
+    default_project = LazyReferenceField(document_type='Project', db_field='default_project_id')  # 用户默认的项目
+    projects = RelationField(document_type='Project', relation_type='has_many', target_field='user')  # 用户有权限的项目
+
     # 是否删除。用来标记该用户是否被删除了
     is_delete = BooleanField()
+    others = DictField(default={})  # 数据迁移时的临时存储信息
 
     def check_password(self, password):
         """检查密码hash.

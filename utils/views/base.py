@@ -56,9 +56,9 @@ class ResourceView(object):
     }
 
     methods = {
+        'collection_read': {'methods': ['GET']},
         'collection_create': {'methods': ['POST']},
         'collection_count': {'methods': ['GET'], 'url': 'count'},
-        'collection_read': {'methods': ['GET']},
         'collection_import': {'methods': ['POST'], 'url': 'import'},
         'item_read': {'methods': ['GET']},
         'item_update': {'methods': ['PUT']},

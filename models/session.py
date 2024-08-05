@@ -10,7 +10,7 @@ from flask import current_app as app
 
 from utils.documents import ResourceDocument
 from utils.fields import StringField, LazyReferenceField, EnumField, IntField, BooleanField
-from .common import UserEnum
+from .enums import UserEnum
 
 
 class Session(ResourceDocument):
@@ -18,6 +18,7 @@ class Session(ResourceDocument):
 
     # user/manager
     user = LazyReferenceField(document_type='User', db_field='user_id')
+    project = LazyReferenceField(document_type='Project', db_field='project_id')
 
     # token
     token = StringField(required=True)

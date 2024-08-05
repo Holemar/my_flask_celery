@@ -16,7 +16,33 @@ _env = os.environ.get('ENV') or 'develop'
 
 
 class User(ResourceView):
-    """User view."""
+    """User view.
+
+    默认已经加上的请求地址：
+ <Rule '/api/user' (GET, OPTIONS, HEAD) -> |collection_read|user|>,
+ <Rule '/api/user' (OPTIONS, POST) -> |collection_create|user|>,
+ <Rule '/api/user/count' (GET, OPTIONS, HEAD) -> |collection_count|user|>,
+ <Rule '/api/user/import' (OPTIONS, POST) -> |collection_import|user|>,
+ <Rule '/api/user/<id>' (GET, OPTIONS, HEAD) -> |item_read|user|>,
+ <Rule '/api/user/<id>' (PUT, OPTIONS) -> |item_update|user|>,
+ <Rule '/api/user/<id>' (OPTIONS, DELETE) -> |item_delete|user|>,
+ <Rule '/api/user/batch' (PUT, OPTIONS) -> |batch_update|user|>,
+ <Rule '/api/user/batch' (OPTIONS, DELETE) -> |batch_delete|user|>,
+ <Rule '/api/user/<id>/default_project' (OPTIONS, POST) -> |item_reference_create|user|default_project>,
+ <Rule '/api/user/<id>/default_project' (GET, OPTIONS, HEAD) -> |item_reference_read|user|default_project>,
+ <Rule '/api/user/<id>/default_project' (OPTIONS, DELETE) -> |item_reference_delete|user|default_project>,
+ <Rule '/api/user/<id>/projects' (OPTIONS, POST) -> |item_relation_create|user|projects>,
+ <Rule '/api/user/<id>/projects/count' (GET, OPTIONS, HEAD) -> |item_relation_count|user|projects>,
+ <Rule '/api/user/<id>/projects' (GET, OPTIONS, HEAD) -> |item_relation_read|user|projects>,
+
+    下面自定义的请求地址：
+ <Rule '/api/user/<id>/remove' (OPTIONS, DELETE) -> |item@remove|user|>,
+ <Rule '/api/user/<id>/delete' (OPTIONS, DELETE) -> |item@delete|user|>,
+ <Rule '/api/user/<id>/completion' (OPTIONS, POST) -> |item@completion|user|>,
+ <Rule '/api/user/login' (OPTIONS, POST) -> |collection@login|user|>,
+ <Rule '/api/user/logout' (OPTIONS, POST) -> |collection@logout|user|>,
+ <Rule '/api/user/register' (OPTIONS, POST) -> |collection@register|user|>,
+    """
 
     """
     @api {POST} /api/user/login 用户登陆
