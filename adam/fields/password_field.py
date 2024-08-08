@@ -78,7 +78,13 @@ class PasswordField(BaseField):
         return self.impl.to_mongo(value)
 
     def to_python(self, value):
-        return self.impl.to_python(value)
+        """解密，获取字段值"""
+        # 避免new实例时异常，如 Model(username='oaxxx', password="password123")
+        try:
+            return self.impl.to_python(value)
+        except Exception as e:
+            # 解密失败，可能是直接传入明文
+            return value
 
     def generate_password(self, password):
         return self.impl.generate_password(password)

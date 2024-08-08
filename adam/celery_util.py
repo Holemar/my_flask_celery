@@ -92,9 +92,11 @@ def load_task_schedule(path):
 
 def delete_repeat_task():
     """删除重复的任务(任务可能太久没执行完，从而再次抛出导致重复)"""
-    broker_url = current_app.conf.broker_url
+    from .flask_app import current_app as app
+    broker_url = app.celery.conf.broker_url
     queues = config.ALL_QUEUES
     limit_tasks = config.LIMIT_TASK
+
     if broker_url.startswith('mongodb://'):
         db = get_mongo_db(broker_url)
         for key in queues:
@@ -171,3 +173,32 @@ def delete_mongodb_repeat_task(db, queue, total):
                 delete_ids.add(d.get("_id"))
         if delete_ids:
             db.messages.remove({"queue": queue, "_id": {'$in': list(delete_ids)}})
+
+
+def get_pending_msg():
+    """获取正在准备执行的worker任务数量"""
+    from .flask_app import current_app as app
+    broker_url = app.celery.conf.broker_url
+    total_msg = 0  # 总任务数
+    queues = config.ALL_QUEUES
+    messages = {key: 0 for key in queues}  # 各队列的任务数
+
+    if broker_url.startswith('mongodb://'):
+        db = get_mongo_db(broker_url)
+        # total_msg = db.messages.count_documents()
+        for key in queues:
+            size = db.messages.count_documents({"queue": key})
+            total_msg += size
+            messages[key] = size
+    elif broker_url.startswith('redis://'):
+        conn = get_redis_client(broker_url)
+        for key in queues:
+            size = conn.llen(key)
+            total_msg += size
+            messages[key] = size
+    # 使用 RabbitMQ
+    elif broker_url.startswith(('amqp://', 'pyamqp://', 'rpc://')):
+        pass  # todo: 未实现
+
+    return total_msg, messages
+

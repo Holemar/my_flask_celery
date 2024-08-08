@@ -4,6 +4,7 @@ import time
 import logging
 from flask import jsonify, request, Blueprint, current_app
 from adam.config_util import config
+from adam.celery_util import get_pending_msg
 
 bp = Blueprint('rout', __name__)
 logger = logging.getLogger(__name__)
@@ -21,7 +22,11 @@ def status():
     message = {'beat': 'ERROR', 'status': 'ERROR', 'pendMsg': 0, 'version': config.VERSION}
     try:
         data = request.args
-        message['route'] = repr(current_app.url_map)
+        if data.get('route') or data.get('url'):
+            message['route'] = list(repr(n) for n in current_app.url_map.iter_rules())
+        if data.get('models'):
+            message['models'] = list(current_app.models.keys())
+        message['pendMsg'], message['tasks'] = get_pending_msg()
         # 版本更新时间
         message['update_time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
         message['now'] = time.strftime('%Y-%m-%d %H:%M:%S')  # 系统时间,用来核对系统时间是否正确
