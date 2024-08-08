@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from utils.documents import ResourceDocument, CommonException
-from utils.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
+from adam.documents import ResourceDocument, CommonException
+from adam.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
                           RelationField, DictField)
 from .enums import UserEnum
 

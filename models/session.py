@@ -8,8 +8,8 @@ from datetime import timedelta, datetime
 import jwt
 from flask import current_app as app
 
-from utils.documents import ResourceDocument
-from utils.fields import StringField, LazyReferenceField, EnumField, IntField, BooleanField
+from adam.documents import ResourceDocument
+from adam.fields import StringField, LazyReferenceField, EnumField, IntField, BooleanField
 from .enums import UserEnum
 
 

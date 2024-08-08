@@ -3,10 +3,14 @@
 密码字段
 """
 
+import os
 import hashlib
 from mongoengine.fields import BaseField
 from abc import ABCMeta, abstractmethod
-from utils.rc4 import encode as rc4_encode
+from ..rc4 import encode as rc4_encode, decode as rc4_decode
+
+# 加密 key 值
+SECRET_SALT = os.environ.get('PASSWORD_SECRET') or os.environ.get('JWT_SECRET', 'befxjbubeg0lacoazvorsokhuofadav1')
 
 
 class IPassword(metaclass=ABCMeta):
@@ -15,9 +19,11 @@ class IPassword(metaclass=ABCMeta):
         pass
 
     def to_mongo(self, value):
+        """加密，储存字段值"""
         return self.generate_password(value)
 
     def to_python(self, value):
+        """解密，获取字段值"""
         return value
 
     def check_password(self, pw_hash, password):
@@ -28,7 +34,7 @@ class IPassword(metaclass=ABCMeta):
 
 class MD5PasswordImpl(IPassword):
     def __init__(self, *args, **kwargs):
-        self.salt = kwargs.get('salt', '')
+        self.salt = kwargs.get('salt', SECRET_SALT)
 
     def generate_password(self, password):
         hash = hashlib.md5((self.salt + password).encode('utf-8')).hexdigest()
@@ -37,11 +43,15 @@ class MD5PasswordImpl(IPassword):
 
 class RC4PasswordImpl(IPassword):
     def __init__(self, *args, **kwargs):
-        self.salt = kwargs.get('salt', '')
+        self.salt = kwargs.get('salt', SECRET_SALT)
 
     def generate_password(self, password):
         secret_txt = rc4_encode(password, self.salt)
         return secret_txt
+
+    def to_python(self, value):
+        """解密，获取字段值"""
+        return rc4_decode(value, self.salt)
 
 
 class PasswordField(BaseField):
@@ -55,8 +65,6 @@ class PasswordField(BaseField):
     }
 
     def __init__(self, *args, **kwargs):
-        # self.enum = enum
-        # kwargs['choices'] = [choice for choice in enum]
         super().__init__(*args, **kwargs)
         self.impl = self.IMPLEMENTATION[kwargs.get('impl', 'rc4')](*args, **kwargs)
 

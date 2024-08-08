@@ -2,17 +2,12 @@
 """
 string Utility
 """
-import os
 import re
 import sys
+import gzip
+import zlib
 import json
-import uuid
-import time
-import datetime
 import base64
-import logging
-import decimal
-from enum import Enum
 
 
 # string encoding, try to encode str or decode bytes by this list
@@ -25,7 +20,7 @@ if default_code not in ENCODE_CODING_LIST:
     ENCODE_CODING_LIST[-1:-1] = [default_code]
 
 
-def decode2str(content):
+def decode2str(content, **kwargs):
     """change str, bytes or bytearray to str"""
     if content is None:
         return None
@@ -126,6 +121,56 @@ def base64_decode(s):
     """使用base64解码"""
     s = encode2bytes(s)
     res = base64.b64decode(s)
+    return decode2str(res)
+
+
+def gzip_encode(content):
+    """
+    使用 gzip 压缩字符串
+    :param {string} content: 明文字符串
+    :return {string}: 压缩后的字符串
+    """
+    if not isinstance(content, (str, bytes, bytearray)):
+        from .json_util import json_serializable
+        content = json.dumps(json_serializable(content))
+    if isinstance(content, str):
+        content = encode2bytes(content)
+    return gzip.compress(content)
+
+
+def gzip_decode(content):
+    """
+    使用 gzip 解压字符串
+    :param {string} content: 压缩后的字符串
+    :return {string}: 解压出来的明文字符串
+    """
+    content = encode2bytes(content)
+    res = gzip.decompress(content)
+    return decode2str(res)
+
+
+def zlib_encode(content):
+    """
+    使用 zlib 压缩字符串
+    :param {string} content: 明文字符串
+    :return {string}: 压缩后的字符串
+    """
+    if not isinstance(content, (str, bytes, bytearray)):
+        from .json_util import json_serializable
+        content = json.dumps(json_serializable(content))
+    if isinstance(content, str):
+        content = encode2bytes(content)
+    return zlib.compress(content, zlib.Z_BEST_COMPRESSION)
+
+
+def zlib_decode(content):
+    """
+    使用 zlib 解压字符串
+    :param {string} content: 压缩后的字符串
+    :return {string}: 解压出来的明文字符串
+    """
+    content = encode2bytes(content)
+    res = zlib.decompress(content)
     return decode2str(res)
 
 

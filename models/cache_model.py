@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import time
-from utils.documents import ResourceDocument
+from adam.documents import ResourceDocument
 
 # 缓存配置的时间(超时则重新读取数据库)
 TIMEOUT = int(os.environ.get('DB_CACHE_TIMEOUT') or 300)

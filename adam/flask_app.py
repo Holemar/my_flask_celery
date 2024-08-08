@@ -20,17 +20,18 @@ from flask import Flask
 from mongoengine import register_connection
 from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
-from utils import celery_util
-from utils.import_util import import_submodules, discovery_items_in_package
-from utils.url_util import RegexConverter, underscore
-from utils.log_filter import WerkzeugLogFilter
-from utils.views import ResourceView, Blueprint
-from utils.documents import ResourceDocument
-from utils.fields import RelationField
-from utils.middlewares import Middleware
+from . import celery_util
+from .import_util import import_submodules, discovery_items_in_package
+from .url_util import RegexConverter, underscore
+from .log_filter import WerkzeugLogFilter
+from .views import ResourceView, Blueprint
+from .documents import ResourceDocument
+from .fields import RelationField
+from .middlewares import Middleware
 
 
 logger = logging.getLogger(__name__)
+current_app = None
 
 
 class Adam(Flask):
@@ -42,11 +43,12 @@ class Adam(Flask):
 
     def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks', model_path='models',
                  enable_celery=False, static_folder='static', template_folder='templates', view_path='views',
-                 url_converters=None, middleware_path='utils/middlewares', **kwargs):
+                 url_converters=None, middleware_path='adam/middlewares', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
         we need to enhance our super-class a little bit.
         """
+        global current_app
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
         cur_dir = os.path.dirname(__file__)
@@ -115,7 +117,7 @@ class Adam(Flask):
                 logger.error('unregistered middleware %s', middleware)
 
         self.auth_backends = []
-        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['utils.auth.token_backend']:
+        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['adam.auth.token_backend']:
             auth_module = importlib.import_module(ab)
             is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
             clsmembers = inspect.getmembers(auth_module, is_class_member)
@@ -127,6 +129,7 @@ class Adam(Flask):
 
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
             celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
+        current_app = self
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
@@ -148,6 +151,10 @@ class Adam(Flask):
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
             print(self.url_map)
+            print('views:', self.views)
+            print('models:', self.models)
+            print('middlewares:', self.middlewares)
+            print('tasks:', self.tasks)
         elif args.mode == 'api':
             host = os.environ.get('HOST') or '0.0.0.0'
             port = int(os.environ.get('PORT') or '8000')
@@ -276,7 +283,7 @@ class Adam(Flask):
         Since we are a Flask subclass, any configuration value supported by
         Flask itself is available (besides Adam's proper settings).
         """
-        self.config.from_object('utils.default_settings')
+        self.config.from_object('adam.default_settings')
 
         # overwrite the defaults with custom user settings
         if isinstance(self.settings, dict):

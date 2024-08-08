@@ -28,7 +28,7 @@ blinker==1.8.2
 flask==3.0.3
 itsdangerous==2.2.0
 
-# utils 安装的依赖
+# adam 安装的依赖
 pyjwt==2.9.0
 # requests 安装的依赖
 certifi==2024.7.4

@@ -33,7 +33,10 @@ class BaseTask(current_app.Task):
 
     def __call__(self, *args, **kwargs):
         logger.debug(f'BaseTask task __call__ args: {args}, kwargs:{kwargs}')
-        return super().__call__(*args, **kwargs)
+        # 让所有的任务函数，都能直接使用 flask.current_app
+        from .flask_app import current_app as app
+        with app.app_context():
+            return super().__call__(*args, **kwargs)
 
 
 '''

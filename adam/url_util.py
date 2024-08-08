@@ -9,7 +9,7 @@ from werkzeug.exceptions import BadRequestKeyError
 from werkzeug.datastructures import MultiDict, CombinedMultiDict
 from mongoengine.fields import DateTimeField
 
-from utils.config_util import config
+from .config_util import config
 
 
 _operators = [

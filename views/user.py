@@ -7,7 +7,7 @@ import os
 import logging
 
 from flask import current_app as app, request, abort
-from utils.views import ResourceView, Blueprint
+from adam.views import ResourceView, Blueprint
 
 
 bp = Blueprint(__name__)

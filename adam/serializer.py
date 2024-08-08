@@ -11,7 +11,7 @@ from mongoengine.base.fields import ObjectIdField
 from mongoengine import Document, EmbeddedDocument
 from flask import current_app as app
 
-from utils.fields import LazyRelation, EnumField, RelationField
+from .fields import LazyRelation, EnumField, RelationField
 
 _build_in_field_names = ['_cls', '_type']
 

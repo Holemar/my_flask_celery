@@ -173,7 +173,7 @@ MIDDLEWARE = []
 
 # 授权后端
 AUTHENTICATION_BACKENDS = [
-    'utils.auth.token_backend'
+    'adam.auth.token_backend'
 ]
 
 BROKER_MODE = os.environ.get('BROKER_MODE') or 'mongodb'

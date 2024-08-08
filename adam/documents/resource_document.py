@@ -14,7 +14,7 @@ from mongoengine.fields import DateTimeField
 from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
 from flask import request
-from utils.serializer import mongo_to_dict
+from ..serializer import mongo_to_dict
 
 logger = logging.getLogger(__name__)
 

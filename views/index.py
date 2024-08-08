@@ -3,7 +3,7 @@ import os
 import time
 import logging
 from flask import jsonify, request, Blueprint, current_app
-from utils.config_util import config
+from adam.config_util import config
 
 bp = Blueprint('rout', __name__)
 logger = logging.getLogger(__name__)

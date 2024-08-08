@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import os
 from flask import current_app as app
 
 
@@ -16,7 +16,7 @@ class Config(object):
             return app.config.get(name)
         except:
             # fallback to the module-level default value
-            return getattr(app, name)
+            return os.environ
 
 
 # makes an instance of the Config helper class available to all the modules

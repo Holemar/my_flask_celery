@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import logging
-from utils.views import ResourceView, Blueprint
+from adam.views import ResourceView, Blueprint
 
 bp = Blueprint(__name__)
 logger = logging.getLogger(__name__)

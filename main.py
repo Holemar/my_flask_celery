@@ -3,7 +3,7 @@ import os
 import logging
 
 import settings
-from utils.flask_app import Adam
+from adam.flask_app import Adam
 from views import index
 
 logger = logging.getLogger(__name__)

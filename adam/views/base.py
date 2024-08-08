@@ -24,11 +24,11 @@ from mongoengine.queryset.visitor import Q
 from mongoengine.fields import LazyReferenceField, ReferenceField
 from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
 
-from utils.documents import CommonException, BussinessCommonException
-from utils.serializer import serialize, dict_to_mongo, mongo_to_dict
-from utils.fields import RelationField
-from utils.url_util import parse_request, payload
-from utils.documents.base import IDocument
+from adam.documents import CommonException, BussinessCommonException
+from adam.serializer import serialize, dict_to_mongo, mongo_to_dict
+from adam.fields import RelationField
+from adam.url_util import parse_request, payload
+from adam.documents.base import IDocument
 from .blueprint import return_data
 
 logger = logging.getLogger(__name__)

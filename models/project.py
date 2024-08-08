@@ -1,7 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from utils.documents import ResourceDocument
-from utils.fields import StringField, BooleanField, LazyReferenceField, DictField
+from adam.documents import ResourceDocument
+from adam.fields import StringField, BooleanField, LazyReferenceField, DictField
 
 
 class Project(ResourceDocument):

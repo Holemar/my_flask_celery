@@ -7,6 +7,7 @@ Updated on 2024/08/03
 @author: Holemar
 """
 import sys
+
 __all__ = ("decode", 'encode', 'encode_symmetrical', 'decode_symmetrical')
 
 
