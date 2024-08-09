@@ -4,6 +4,9 @@ import os
 VERSION = '1.0.0'
 APP_NAME = os.environ.get('APP_NAME', 'my_flask_celery')
 
+# debug=true 时，程序修改后 api 服务会自动重启， log 也会变成 debug 级别(默认 info 级别)
+DEBUG = os.environ.get('DEBUG', '').lower() in ('true', '1')
+
 CURRENT_DIR, _ = os.path.split(os.path.abspath(__file__))
 CURRENT_DIR = CURRENT_DIR or os.getcwd()  # 当前目录
 

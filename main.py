@@ -17,4 +17,4 @@ app.register_blueprint(index.bp, url_prefix="")
 
 if __name__ == '__main__':
     # 程序启动
-    app.run()
+    app.run(debug=settings.DEBUG)

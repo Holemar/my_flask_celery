@@ -5,6 +5,7 @@ import logging
 from flask import jsonify, request, Blueprint, current_app
 from adam.config_util import config
 from adam.celery_util import get_pending_msg
+from adam.json_util import json_serializable
 
 bp = Blueprint('rout', __name__)
 logger = logging.getLogger(__name__)
@@ -22,10 +23,17 @@ def status():
     message = {'beat': 'ERROR', 'status': 'ERROR', 'pendMsg': 0, 'version': config.VERSION}
     try:
         data = request.args
+        # 参数控制查看内容, 如： http://127.0.0.1:8000/status?url=1&models=1&config=1
         if data.get('route') or data.get('url'):
             message['route'] = list(repr(n) for n in current_app.url_map.iter_rules())
         if data.get('models'):
             message['models'] = list(current_app.models.keys())
+        if data.get('config'):
+            values = {k: json_serializable(v) for k, v in current_app.config.items()}
+            # 内嵌类，需要额外读取
+            c_config = current_app.config['CELERY_CONFIG']
+            values['CELERY_CONFIG'] = {k: getattr(c_config, k) for k in dir(c_config) if not k.startswith('__')}
+            message['config'] = values
         message['pendMsg'], message['tasks'] = get_pending_msg()
         # 版本更新时间
         message['update_time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
