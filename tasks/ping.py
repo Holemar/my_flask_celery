@@ -5,7 +5,7 @@ from celery import current_app
 logger = logging.getLogger(__name__)
 
 
-@current_app.task(name='my_celery_mq.tasks.ping', priority=9)
+@current_app.task(name='my_celery_mq.tasks.ping')
 def process():
     """
     ping
