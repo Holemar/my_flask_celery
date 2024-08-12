@@ -13,6 +13,8 @@ import decimal
 import uuid
 import logging
 import logging.config
+from logging.handlers import TimedRotatingFileHandler as fileHandler
+
 from celery.signals import after_setup_logger, after_setup_task_logger
 
 P_REQUEST_LOG = re.compile(r'^(.*?) - - \[(.*?)\] "(.*?)" (\d+) (\d+|-)$')
@@ -205,13 +207,19 @@ db_handler.setFormatter(_formatter)
 db_handler.setLevel(DB_LOG_LEVEL)
 logger.addHandler(db_handler)
 
+# 文件日志
+file_handler = None
+
 
 @after_setup_task_logger.connect()
 def task_logger_setup_handler(*args, **kwargs):
     """
     worker logger
     """
-    logger.addHandler(stdout_handler)
+    if file_handler:
+        logger.addHandler(file_handler)
+    else:
+        logger.addHandler(stdout_handler)
     logger.addHandler(stderr_handler)
     logger.addHandler(db_handler)
 
@@ -223,10 +231,45 @@ def global_logger_setup_handler(*args, **kwargs):
     """
     添加 celery 的 logger，它会清除之前的所有 log Handler，需要这里重新添加一次
     """
-    logger.addHandler(stdout_handler)
+    if file_handler:
+        logger.addHandler(file_handler)
+    else:
+        logger.addHandler(stdout_handler)
     logger.addHandler(stderr_handler)
     logger.addHandler(db_handler)
 
     logging.info("celery log handler connected -> Global Logging")
 
+
+def add_file_handler(log_file, logger_level, append=not DEBUG, backup_count=30, formatter=_formatter):
+    """
+    给 logger 加上 文件 日志处理
+    :param {string} log_file: 日志文件的名称
+    :param {bool | string} logger_level: 日志级别,默认级别:INFO
+    :param {bool} append: 是否追加日志，默认为 True (追加到旧日志文件后面)， 设置为 False 时会先删除旧日志文件
+    :param {int} backup_count: 日志文件保留天数
+    :param {logging.Formatter} formatter: 日志输出格式
+    """
+    global file_handler
+    if not log_file: return
+
+    logger_level = logger_level.upper() if isinstance(logger_level, str) else logger_level
+    logger.setLevel(logger_level)
+    log_file = os.path.abspath(log_file)
+    log_path = os.path.dirname(log_file)
+    # 没有日志文件的目录，则先创建目录，避免因此报错
+    if not os.path.isdir(log_path):
+        os.makedirs(log_path)
+    # 不追加日志，则先清空旧日志文件
+    if append is False and os.path.isfile(log_file):
+        try:
+            open(log_file, mode="w").close()
+        except:
+            os.popen('echo""> "%s"' % log_file)
+    # 添加日志处理器
+    file_handler = fileHandler(log_file, when='midnight', backupCount=backup_count)
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logger_level)
+    file_handler.addFilter(string_filter)
+    logger.addHandler(file_handler)
 

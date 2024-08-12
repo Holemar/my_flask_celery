@@ -23,7 +23,7 @@ from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, Em
 from . import celery_util
 from .import_util import import_submodules, discovery_items_in_package
 from .url_util import RegexConverter, underscore
-from .log_filter import WerkzeugLogFilter
+from .log_filter import WerkzeugLogFilter, add_file_handler
 from .views import ResourceView, Blueprint
 from .documents import ResourceDocument
 from .fields import RelationField
@@ -134,19 +134,16 @@ class Adam(Flask):
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
         parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor'])
-        parser.add_argument('-p', '--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
+        parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
         parser.add_argument('-Q', '--queues', default=','.join(self.config.get('ALL_QUEUES')))
         parser.add_argument('--prefetch-multiplier', default='')
-        parser.add_argument('--logfile', default='')
-        parser.add_argument('--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
+        parser.add_argument('-f', '--logfile', default='')
+        parser.add_argument('-p', '--port', default='')
+        parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
-        if args.logfile:
-            # 没有日志文件的目录，则先创建目录，避免因此报错
-            file_path = os.path.dirname(os.path.abspath(args.logfile))
-            if not os.path.isdir(file_path):
-                os.makedirs(file_path)
+        add_file_handler(args.logfile, args.loglevel)
 
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
