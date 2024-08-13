@@ -14,8 +14,8 @@ from mongoengine import Document
 from mongoengine.fields import IntField, StringField, DictField
 
 from adam.documents import ResourceDocument
-from adam.str_util import decode2str
-from adam.json_util import json_serializable
+from adam.utils.str_util import decode2str
+from adam.utils.json_util import json_serializable
 
 # 记录各变量时，排除的类型
 NotRecordTypes = (types.FunctionType, types.LambdaType, types.ModuleType, type(Document), type)

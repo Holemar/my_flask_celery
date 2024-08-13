@@ -2,23 +2,30 @@
   {
     "name": "task_ping",
     "task": "fc_agent.tasks.ping",
-    "schedule": 10  // 每 10 秒执行一次
+    "_task": "下划线开头的字段，认为是备注信息，解析时会忽略",
+    "schedule": 10,
+    "_schedule": "每 10 秒执行一次"
   },
   {
     "name": "tasks_master_fetch",
     "task": "fc_agent.tasks.master_fetch",
-    "schedule": "5"  // 每 5 秒执行一次
+    "schedule": "5",
+    "_schedule": "每 5 秒执行一次"
   },
   {
     "name": "task_master_notify",
     "task": "fc_agent.tasks.master_notify",
-    "schedule": "*/1 * * * *"  // 每分钟执行一次。 5个星号分别表示 minute='*/1', hour='*', day_of_month='*', day_of_week='*', month_of_year='*'
+    "schedule": "*/1 * * * *",
+    "_schedule": "每分钟执行一次。 5个星号分别表示 minute='*/1', hour='*', day_of_month='*', day_of_week='*', month_of_year='*'"
   },
   {
     "name": "task_master_notify2",
     "task": "fc_agent.tasks.master_notify2",
-    "schedule": "*/10 8-18 * * *",  // 每天的 8 点到 18 点，每隔 10 分钟执行一次
-    "args": [1, 16],  // task 参数
-    "options" : {"queue": "my_period_task"}  // 指定其它执行信息
+    "schedule": "*/10 8-18 * * *",
+    "_schedule": "每天的 8 点到 18 点，每隔 10 分钟执行一次",
+    "args": [1, 16],
+    "_args": "task 参数",
+    "options" : {"queue": "my_period_task"},
+    "_options" : "指定其它执行信息"
   }
 ]

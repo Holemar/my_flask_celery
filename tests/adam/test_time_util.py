@@ -10,7 +10,7 @@ import time
 from datetime import datetime, date, timedelta, time as dt
 import unittest
 
-from adam.time_util import *
+from adam.utils.time_util import *
 
 now = lambda: datetime.now().replace(microsecond=0)
 

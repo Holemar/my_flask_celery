@@ -2,7 +2,7 @@
 
 from adam.documents import ResourceDocument, CommonException
 from adam.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
-                          RelationField, DictField)
+                         RelationField, DictField)
 from .enums import UserEnum
 
 

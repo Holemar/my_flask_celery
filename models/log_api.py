@@ -8,8 +8,8 @@ from flask import request, g
 from mongoengine.fields import IntField, FloatField, StringField, DictField
 
 from adam.documents import ResourceDocument
-from adam.str_util import decode2str
-from adam.json_util import load_json
+from adam.utils.str_util import decode2str
+from adam.utils.json_util import load_json
 from .log import Log, repr_value
 
 # log的保存天数，超过则自动删除

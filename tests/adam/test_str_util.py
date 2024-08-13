@@ -5,7 +5,7 @@ string Utility unittest
 
 import unittest
 
-from adam import str_util
+from adam.utils import str_util
 
 
 class TestStrUtil(unittest.TestCase):

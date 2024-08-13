@@ -3,9 +3,9 @@ import os
 import time
 import logging
 from flask import jsonify, request, Blueprint, current_app
-from adam.config_util import config
-from adam.celery_util import get_pending_msg
-from adam.json_util import json_serializable
+from adam.utils.config_util import config
+from adam.utils.celery_util import get_pending_msg
+from adam.utils.json_util import json_serializable
 
 bp = Blueprint('rout', __name__)
 logger = logging.getLogger(__name__)

@@ -41,19 +41,30 @@ VERSION_ID_SUFFIX = '_document'
 VERSION_DIFF_INCLUDE = []       # always include these fields when diffing
 
 API_VERSION = ''
-URL_PREFIX = ''
+URL_PREFIX = 'api'   # 所有后端 API 的前缀
 ID_FIELD = '_id'
 CACHE_CONTROL = ''
 CACHE_EXPIRES = 0
 ITEM_CACHE_CONTROL = ''
-X_DOMAINS = None                # CORS disabled by default.
+X_DOMAINS = '*'                 # CORS 允许访问的域名，星号表示允许所有
 X_DOMAINS_RE = None             # CORS disabled by default.
-X_HEADERS = None                # CORS disabled by default.
+X_HEADERS = [                   # CORS disabled by default.
+    'Authorization',
+    'Content-Language',
+    'Content-Type',
+    'Expires',
+    'Last-Modified',
+    'Accept',
+    'Cache-Control',
+    'Accept-Encoding',
+    'Accept-Language',
+    'Debug'
+]
 X_EXPOSE_HEADERS = None         # CORS disabled by default.
-X_ALLOW_CREDENTIALS = None      # CORS disabled by default.
+X_ALLOW_CREDENTIALS = True      # CORS disabled by default.
 X_MAX_AGE = 21600               # Access-Control-Max-Age when CORS is enabled
 HATEOAS = False                 # HATEOAS enabled by default.
-IF_MATCH = True                 # IF_MATCH (ETag match) enabled by default.
+IF_MATCH = False                 # IF_MATCH (ETag match) enabled by default.
 ENFORCE_IF_MATCH = True         # ENFORCE_IF_MATCH enabled by default.
 EXTRA_HEADERS = {}
 
@@ -65,7 +76,7 @@ EMBEDDING = True                # embedding enabled by default
 INCLUDING = True                # including enabled by default
 PROJECTION = True               # projection enabled by default
 PAGINATION = True               # pagination enabled by default.
-PAGINATION_LIMIT = 50
+PAGINATION_LIMIT = 150          # 每页显示条目的最大值
 PAGINATION_DEFAULT = 25
 VERSIONING = False              # turn document versioning on or off.
 VERSIONS = '_versions'          # suffix for parallel collection w/old versions
@@ -84,8 +95,8 @@ OPLOG_METHODS = ['DELETE', 'POST', 'PATCH', 'PUT']         # oplog logs all oper
 OPLOG_CHANGE_METHODS = ['DELETE', 'PATCH', 'PUT']  # methods which write changes to the oplog
 OPLOG_RETURN_EXTRA_FIELD = False    # oplog does not return the 'extra' field.
 
-RESOURCE_METHODS = ['GET']
-ITEM_METHODS = ['GET']
+RESOURCE_METHODS = ['GET', 'POST', 'DELETE']
+ITEM_METHODS = ['GET', 'PATCH', 'PUT', 'DELETE']
 PUBLIC_METHODS = []
 ALLOWED_ROLES = []
 ALLOWED_READ_ROLES = []
@@ -102,9 +113,9 @@ ITEM_URL = 'regex("[a-f0-9]{24}")'
 UPSERT_ON_PUT = True            # insert unexisting documents on PUT.
 
 # use a simple file response format by default
-EXTENDED_MEDIA_INFO = []
-RETURN_MEDIA_AS_BASE64_STRING = True
-RETURN_MEDIA_AS_URL = False
+EXTENDED_MEDIA_INFO = ['content_type', 'name', 'length']
+RETURN_MEDIA_AS_BASE64_STRING = False
+RETURN_MEDIA_AS_URL = True
 MEDIA_ENDPOINT = 'media'
 MEDIA_URL = 'regex("[a-f0-9]{24}")'
 MEDIA_BASE_URL = None

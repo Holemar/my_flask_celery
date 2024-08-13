@@ -10,7 +10,7 @@ import decimal
 import datetime
 import unittest
 
-from adam import json_util
+from adam.utils import json_util
 
 
 class TestJsonUtil(unittest.TestCase):

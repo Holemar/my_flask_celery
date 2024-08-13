@@ -20,10 +20,10 @@ from flask import Flask
 from mongoengine import register_connection
 from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
-from . import celery_util
-from .import_util import import_submodules, discovery_items_in_package
-from .url_util import RegexConverter, underscore
-from .log_filter import WerkzeugLogFilter, add_file_handler
+from .utils import celery_util
+from .utils.import_util import import_submodules, discovery_items_in_package
+from .utils.url_util import RegexConverter, underscore
+from .utils.log_filter import WerkzeugLogFilter, add_file_handler
 from .views import ResourceView, Blueprint
 from .documents import ResourceDocument
 from .fields import RelationField

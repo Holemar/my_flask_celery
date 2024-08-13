@@ -10,7 +10,7 @@ import time
 import logging
 from flask import request
 
-from ..config_util import config
+from ..utils.config_util import config
 from .base import Middleware
 
 # api 超时警告时间，单位：秒

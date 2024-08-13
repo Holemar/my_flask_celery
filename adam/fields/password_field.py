@@ -7,7 +7,7 @@ import os
 import hashlib
 from mongoengine.fields import BaseField
 from abc import ABCMeta, abstractmethod
-from ..rc4 import encode as rc4_encode, decode as rc4_decode
+from ..utils.rc4 import encode as rc4_encode, decode as rc4_decode
 
 # 加密 key 值
 SECRET_SALT = os.environ.get('PASSWORD_SECRET') or os.environ.get('JWT_SECRET', 'befxjbubeg0lacoazvorsokhuofadav1')

@@ -5,7 +5,7 @@ Document abstract class
 """
 import logging
 from abc import abstractmethod
-from ..import_util import parse_csv_content
+from ..utils.import_util import parse_csv_content
 
 logger = logging.getLogger(__name__)
 

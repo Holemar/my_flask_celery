@@ -52,4 +52,3 @@ MONGO_CONNECTIONS = {
 # API
 JWT_SECRET = os.environ.get('JWT_SECRET', 'befxjbubeg0lacoazvorsokhuofadav1')
 JWT_EXPIRES = 24
-URL_PREFIX = 'api'  # 所有后端 API 的前缀

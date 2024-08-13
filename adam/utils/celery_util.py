@@ -5,7 +5,7 @@ import logging
 import inspect
 import importlib
 
-from celery import Celery, current_app, Task
+from celery import current_app, Task
 from celery.schedules import crontab
 
 from .import_util import import_submodules, discovery_items_in_package
@@ -32,7 +32,7 @@ if not hasattr(Celery, '_old_send_task'):
 
 def set_base_task():
     """重新赋予基类"""
-    from .celery_base_task import BaseTask
+    from ..celery_base_task import BaseTask
     current_app.Task = BaseTask
 
 
@@ -83,14 +83,16 @@ def load_task_schedule(path):
         for r_task in rules:
             name = r_task.pop('name')
             cron = parse_cron(r_task.pop('schedule'))
-            schedule[name] = r_task  # 保留原始配置(允许配置更多参数)
-            schedule[name]['schedule'] = cron
+            # 过滤掉下划线开头的 key，用于备注
+            new_task = {k: v for k, v in r_task.items() if not k.startswith('_')}
+            new_task['schedule'] = cron
+            schedule[name] = new_task  # 保留原始配置(允许配置更多参数)
     current_app.conf.beat_schedule = schedule
 
 
 def delete_repeat_task():
     """删除重复的任务(任务可能太久没执行完，从而再次抛出导致重复)"""
-    from .flask_app import current_app as app
+    from ..flask_app import current_app as app
     broker_url = app.celery.conf.broker_url
     queues = config.ALL_QUEUES
     limit_tasks = config.LIMIT_TASK
@@ -175,7 +177,7 @@ def delete_mongodb_repeat_task(db, queue, total):
 
 def get_pending_msg():
     """获取正在准备执行的worker任务数量"""
-    from .flask_app import current_app as app
+    from ..flask_app import current_app as app
     broker_url = app.celery.conf.broker_url
     total_msg = 0  # 总任务数
     queues = config.ALL_QUEUES

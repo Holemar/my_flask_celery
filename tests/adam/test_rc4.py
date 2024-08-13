@@ -11,7 +11,7 @@ import time
 import logging
 import unittest
 
-from adam import rc4
+from adam.utils import rc4
 
 
 PY2 = sys.version_info[0] == 2
