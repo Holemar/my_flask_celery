@@ -90,4 +90,7 @@ class PasswordField(BaseField):
         return self.impl.generate_password(password)
 
     def check_password(self, pw_hash, password):
+        # 可能已经解码(从数据库读取出来会自动解码)
+        if pw_hash == password:
+            return True
         return self.impl.check_password(pw_hash, password)

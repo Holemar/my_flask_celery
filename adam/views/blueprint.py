@@ -5,6 +5,7 @@ Blueprint, different to Flask one
 import os
 import logging
 
+from mongoengine import Document
 from werkzeug.exceptions import HTTPException
 from flask import request
 
@@ -13,14 +14,13 @@ SUCCESS_CODE = int(os.environ.get('SUCCESS_CODE', 200))  # 成功的返回码
 SUCCESS_MESSAGE = os.environ.get('SUCCESS_MESSAGE', 'success')  # 成功的返回值
 
 
-def return_data(code=None, message=None, data=None, **kwargs):
+def return_data(code=None, message=None, data=None):
     """
     响应数据
     """
     result = {
         'code': code or SUCCESS_CODE,
         'message': message or SUCCESS_MESSAGE,
-        **kwargs
     }
     if data is not None:
         result['data'] = data
@@ -81,7 +81,9 @@ def run_api(fun):
         try:
             res = fun(*args, **kwargs)
             # 强行封装成统一格式
-            if isinstance(res, dict) and 'code' not in res:
+            if isinstance(res, (list, dict)) and 'code' not in res:
+                res = return_data(data=res)
+            elif isinstance(res, Document):
                 res = return_data(data=res)
             return res
         except HTTPException as e:

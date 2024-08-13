@@ -17,6 +17,7 @@ from datetime import datetime
 from urllib.parse import quote
 
 import mongoengine
+from mongoengine import Document
 from flask import request, abort, Response
 from flask import current_app as app
 from bson import ObjectId
@@ -273,7 +274,9 @@ class ResourceView(object):
         if hasattr(request, 'req'):
             included = request.req.included or []
         # 强行封装成统一格式
-        if isinstance(obj, dict) and 'code' not in obj:
+        if isinstance(obj, (list, dict)) and 'code' not in obj:
+            obj = return_data(data=obj)
+        elif isinstance(obj, Document):
             obj = return_data(data=obj)
         response = serialize('_root', obj, None, included=included)
         ua = request.headers.get('User-Agent')
@@ -298,7 +301,8 @@ class ResourceView(object):
             if _env != 'production':
                 callstack = traceback.format_exc().splitlines()
 
-        error = return_data(code=code, message=message, detail=detail, callstack=callstack)
+        data = {'detail': detail, 'callstack': callstack}
+        error = return_data(code=code, message=message, data=data)
         logger.error(error)
 
         ua = request.headers.get('User-Agent')
@@ -399,7 +403,7 @@ class ResourceView(object):
         """
         data = request.get_json() or {}
         items = self.model.import_csv(data)
-        return return_data(items=items)
+        return return_data(data={'items': items})
 
     def collection_count(self):
         """
@@ -437,7 +441,7 @@ class ResourceView(object):
             items = list(queryset.aggregate(*pipeline))
 
         # build items
-        return return_data(items=items, meta={'total': count})
+        return return_data(data={'items': items, 'meta': {'total': count}})
 
     def collection_read(self):
         """
@@ -506,11 +510,11 @@ class ResourceView(object):
         self._patch_included(items, included_fields)
 
         # build items
-        return return_data(items=items, meta={
+        return return_data(data={'items': items, 'meta': {
             'page': page,
             'max_results': limit,
             'total': count
-        })
+        }})
 
     def _before_collection_create(self):
         pass
@@ -544,7 +548,7 @@ class ResourceView(object):
         if user and self.model._fields.get('user') and not create_data.get('user'):
             instance.user = request.user
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def batch_update(self, instances):
         """
@@ -558,7 +562,7 @@ class ResourceView(object):
                 for k, v in update.items():
                     instance[k] = v
                 instance.save()
-        return return_data(items=instances)
+        return return_data(data={'items': instances})
 
     def batch_delete(self, instances):
         """
@@ -566,13 +570,13 @@ class ResourceView(object):
         """
         for instance in instances:
             instance.delete()
-        return return_data(deleted=True)
+        return return_data(data={'deleted': True})
 
     def item_read(self, instance):
         """
         item endpoint GET
         """
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_embedded_list_create(self, instance):
         """
@@ -584,7 +588,7 @@ class ResourceView(object):
         embedded_instance = embedded_field.document_type(**data)
         instance[embedded].append(embedded_instance)
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_embedded_list_delete(self, instance, index):
         """
@@ -598,7 +602,7 @@ class ResourceView(object):
         instance.save()
         del instance[embedded][index]
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_embedded_list_update(self, instance, index):
         """
@@ -613,7 +617,7 @@ class ResourceView(object):
         update = embedded_field.document_type(**data)
         instance[embedded][index] = update
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_reference_create(self, instance):
         """
@@ -631,7 +635,7 @@ class ResourceView(object):
         reference_instance.save()
         instance[reference] = reference_instance
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_reference_delete(self, instance):
         """
@@ -647,7 +651,7 @@ class ResourceView(object):
                     reference_instance.delete()
                 instance[reference] = None
         instance.save()
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_reference_read(self, instance):
         """
@@ -658,9 +662,9 @@ class ResourceView(object):
         if reference_field:
             obj = getattr(instance, reference)
             if isinstance(reference_field, ReferenceField):
-                return obj
+                return return_data(data={'item': obj})
             elif isinstance(reference_field, LazyReferenceField):
-                obj.fetch()
+                return return_data(data={'item': obj.fetch()})
         return return_data()
 
     def item_reference_file(self, instance, field, sub_field):
@@ -705,7 +709,7 @@ class ResourceView(object):
             relation_instance.user = request.user
         relation_instance[relation_ref.target_field] = instance
         relation_instance.save()
-        return return_data(item=relation_instance)
+        return return_data(data={'item': relation_instance})
 
     def item_relation_count(self, instance):
         """
@@ -721,7 +725,7 @@ class ResourceView(object):
             if by:
                 pipeline = [{"$group": {"_id": '$' + by, "count": {"$sum": 1}}}]
                 items = list(queryset.aggregate(*pipeline))
-            return return_data(items=items, meta={'total': count})
+            return return_data(data={'items': items, 'meta': {'total': count}})
         return return_data(code=400, message='Not a valid relation')
 
     def item_relation_read(self, instance):
@@ -746,11 +750,11 @@ class ResourceView(object):
             skip = (page - 1) * limit
             # 取数据
             items = queryset.order_by(*sort).limit(limit).skip(skip)
-            return return_data(items=list(items), meta={
+            return return_data(data={'items': list(items), 'meta': {
                 'page': page,
                 'max_results': limit,
                 'total': count
-            })
+            }})
         return return_data(code=400, message='Not a valid relation')
 
     def item_file_preview(self, instance):
@@ -804,14 +808,14 @@ class ResourceView(object):
                 instance[k] = v
             instance.save()
             # instance.update(**update)
-        return return_data(item=instance)
+        return return_data(data={'item': instance})
 
     def item_delete(self, instance):
         """
         item endpoint PUT
         """
         instance.delete()
-        return return_data(deleted=True)
+        return return_data(data={'deleted': True})
 
     def proxy_collection_count(self):
         """

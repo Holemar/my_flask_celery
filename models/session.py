@@ -53,6 +53,6 @@ class Session(ResourceDocument):
         exp = datetime.utcnow() + td
         jwt_object = {'user_id': str(user.id), 'mobile': user.mobile, 'email': user.email,
                       'user_type': user_type.value, 'exp': exp}
-        token = jwt.encode(jwt_object, app.config.get('JWT_SECRET'), algorithm='HS256').decode()
+        token = jwt.encode(jwt_object, app.config.get('JWT_SECRET'), algorithm='HS256')
         session = cls(user=user, token=token, user_type=user_type).save()
         return session
