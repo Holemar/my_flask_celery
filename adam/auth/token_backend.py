@@ -56,10 +56,6 @@ class TokenBackend(BasicBackend):
                         user = user_mode.objects(id=session_object.user.id).first()
                         request.user = user
                         request.original_user = user
-                        if user.delegate_as:
-                            logger.info('delegate user as {}'.format(str(user.delegate_as)))
-                            user = user_mode.objects(id=user.delegate_as).first()
-                            request.user = user
                     # else:
                     #     abort(401, description='token does not exists')
             except (jwt.DecodeError, jwt.ExpiredSignatureError) as ex:
