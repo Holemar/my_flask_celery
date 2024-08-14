@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import re
+import os
 import logging
 import inspect
 import pkgutil
@@ -28,16 +29,32 @@ def import_submodules(package, recursive=True):
     return results
 
 
-def discovery_items_in_package(package, func_lookup=inspect.isfunction):
+def discovery_items_in_package(package, func_lookup=None):
     """
         discovery all function at most depth(2) in specified package
     """
+    func_lookup = func_lookup or inspect.isfunction
     functions = []
     _modules = import_submodules(package)
     for _k, _m in _modules.items():
         functions.extend(inspect.getmembers(_m, func_lookup))
 
     return functions
+
+
+def load_modules(path, func_lookup=None):
+    """
+        加载指定目录下的所有类(不包含同名的类)
+    """
+    models = {}
+
+    path = path.replace('/', '.')
+    package = importlib.import_module(path)
+    all_modules = discovery_items_in_package(package, func_lookup)
+
+    for _k, _m in all_modules:
+        models[_k] = _m
+    return models
 
 
 def parse_csv_content(content, schema):

@@ -21,7 +21,7 @@ from mongoengine import register_connection
 from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
 from .utils import celery_util
-from .utils.import_util import import_submodules, discovery_items_in_package
+from .utils.import_util import import_submodules, load_modules
 from .utils.url_util import RegexConverter, underscore
 from .utils.log_filter import WerkzeugLogFilter, add_file_handler
 from .views import ResourceView, Blueprint
@@ -183,12 +183,12 @@ class Adam(Flask):
             package_name = path.replace('/', '.')
             package = importlib.import_module(package_name)
             customize_view_modules = import_submodules(package)
-            all_view_modules = all_view_modules + list(customize_view_modules.values())
+            all_view_modules = list(customize_view_modules.values())
 
+        lookup_view = lambda x: (inspect.isclass(x) and x != ResourceView
+                                 and not getattr(x, "_meta", {}).get('abstract') and issubclass(x, ResourceView))
+        lookup_bp = lambda x: isinstance(x, Blueprint)
         for module in all_view_modules:
-            lookup_view = lambda x: inspect.isclass(x) and x != ResourceView and not getattr(x, "_meta", {}).get(
-                'abstract') and issubclass(x, ResourceView)
-            lookup_bp = lambda x: isinstance(x, Blueprint)
             views = inspect.getmembers(module, lookup_view)
 
             # filter, get rid of alias,
@@ -230,48 +230,17 @@ class Adam(Flask):
 
     def load_models(self, path):
         """
-        load all mode logic
+        load all model logic
         """
-        all_models_modules = list()
-
-        if os.path.exists(path):
-            package_name = path.replace('/', '.')
-            package = importlib.import_module(package_name)
-            customize_model_modules = import_submodules(package)
-            all_models_modules = all_models_modules + list(customize_model_modules.values())
-
-        for module in all_models_modules:
-            lookup_model = lambda x: inspect.isclass(x) and x != ResourceDocument and issubclass(x, ResourceDocument)
-            models = inspect.getmembers(module, lookup_model)
-            # filter, get rid of alias,
-            models = list(filter(lambda x: x[0] == x[1].__name__, models))
-            if not models:
-                continue
-            name = models[-1][0]
-            resource = name
-            cls_model = models[-1][1]
-            # check alias
-            if cls_model.__bases__ and cls_model.__bases__[0] != ResourceDocument:
-                new_resource = cls_model.__bases__[0].__name__
-                self.models[new_resource] = cls_model
-            self.models[resource] = cls_model
+        lookup_model = lambda x: inspect.isclass(x) and x != ResourceDocument and issubclass(x, ResourceDocument)
+        self.models = load_modules(path, lookup_model)
 
     def load_middleware(self, path):
         """
         load all middleware
         """
-        all_middlewares = []
         func_lookup = lambda x: inspect.isclass(x) and x != Middleware and issubclass(x, Middleware)
-
-        if os.path.exists(path):
-            package_name = path.replace('/', '.')
-            package = importlib.import_module(package_name)
-            customize_middlewares = discovery_items_in_package(package, func_lookup)
-            all_middlewares = all_middlewares + customize_middlewares
-
-        for _k, _m in all_middlewares:
-            logger.debug('Load middleware: %s', _k)
-            self.middlewares[_k] = _m
+        self.middlewares = load_modules(path, func_lookup)
 
     def load_config(self):
         """ API settings are loaded from standard python modules. First from

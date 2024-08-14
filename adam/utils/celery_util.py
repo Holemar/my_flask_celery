@@ -78,7 +78,7 @@ def load_task_schedule(path):
     if not os.path.exists(path):
         return
     schedule = {}
-    with open(path, 'r') as reader:
+    with open(path, 'r', encoding='utf-8') as reader:
         rules = json.load(reader)
         for r_task in rules:
             name = r_task.pop('name')
