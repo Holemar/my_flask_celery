@@ -8,6 +8,7 @@
 /Thumbs.db
 /venv/
 /.svn
+/.run
 /.idea
 .project
 .pydevproject
