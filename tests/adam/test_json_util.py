@@ -89,7 +89,7 @@ class TestJsonUtil(unittest.TestCase):
                 u'元组': (set('abcd'), decimal.Decimal('55.6722'), datetime.datetime(2015, 6, 28, 14, 19, 41)),
                 datetime.date(2019, 6, 18): uuid.UUID('81ab20bf-ecd9-4cc7-beb1-498da7e0b75d')}
         self.assertEqual(json_util.json_serializable(arg1),
-            {'aa': 4.55, 'b1': {'ll': 66.55, '测试': 554, '测试2': '测试2值', 'c': [1, '哈啊', '啊哈']},
+                         {'aa': 4.55, 'b1': {'ll': 66.55, '测试': 554, '测试2': '测试2值', 'c': [1, '哈啊', '啊哈']},
              '元组': [list(set('abcd')), 55.6722, '2015-06-28T14:19:41'],
              '2019-06-18': '81ab20bfecd94cc7beb1498da7e0b75d'})
 

@@ -8,6 +8,7 @@ import sys
 import logging
 sys.path.insert(1, '..')
 
+from mongoengine.queryset.visitor import Q
 from adam.flask_app import Adam
 from models.user import User
 from models.enums import UserEnum
@@ -77,6 +78,16 @@ logging.info(f'in查询取 {len(list(in_users))} 个用户')
 # 查询 others 字段中的 projects 值不为空列表
 users = app.models['User'].objects.filter(others__projects__ne=[]).all()
 logging.info(f'内嵌查询到 {users.count()} 个用户')
+
+# or 查询 | 复杂条件查询
+queryset = User.objects()
+if 1 == 1:  # 复杂条件查询，使用多次 filter 处理。 这里的 if 模拟需要判断的多个条件
+    queryset = queryset.filter(is_delete__ne=True)
+if 2 == 2:  # or 查询使用多个 Q 来处理
+    queryset = queryset.filter(Q(user_name='user_name') | Q(mobile='135..4565') | Q(email='dd@144.cn'))
+# 这用户的查询条件是: is_delete != true AND (user_name='user_name' OR mobile='135..4565' OR email='dd@144.cn')
+or_user = queryset.first()
+
 
 '''
 # 列举出各函数
