@@ -178,11 +178,17 @@ def delete_mongodb_repeat_task(db, queue, total):
 def get_pending_msg():
     """获取正在准备执行的worker任务数量"""
     from ..flask_app import current_app as app
-    broker_url = app.celery.conf.broker_url
     total_msg = 0  # 总任务数
     queues = config.ALL_QUEUES
     messages = {key: 0 for key in queues}  # 各队列的任务数
+    for key in queues:
+        queue_info2 = app.celery.connection().channel().queue_declare(key, passive=True)
+        message_count = queue_info2.message_count
+        total_msg += message_count
+        messages[key] = message_count
 
+    """
+    broker_url = app.celery.conf.broker_url
     if broker_url.startswith('mongodb://'):
         db = get_mongo_db(broker_url)
         # total_msg = db.messages.count_documents()
@@ -199,6 +205,7 @@ def get_pending_msg():
     # 使用 RabbitMQ
     elif broker_url.startswith(('amqp://', 'pyamqp://', 'rpc://')):
         pass  # todo: 未实现
+    """
 
     return total_msg, messages
 
