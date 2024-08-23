@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import re
-import os
 import logging
 import inspect
 import pkgutil
@@ -23,7 +22,10 @@ def import_submodules(package, recursive=True):
         if name.startswith('_'):
             continue
         full_name = package.__name__ + '.' + name
-        results[full_name] = importlib.import_module(full_name)
+        try:
+            results[full_name] = importlib.import_module(full_name)
+        except Exception as e:
+            logger.warning('Failed to import %s: %s', full_name, e)
         if recursive and is_pkg:
             results.update(import_submodules(full_name))
     return results

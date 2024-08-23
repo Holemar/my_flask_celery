@@ -21,6 +21,12 @@
   {
     "name": "task_master_notify2",
     "task": "fc_agent.tasks.master_notify2",
+    "schedule": "0 8-23/1 * * *",
+    "_schedule": "每天的 8 点到 23 点，每隔 1 小时执行一次。 这里注意分钟位置要写 0，如果写 * 则表示每分钟都执行。"
+  },
+  {
+    "name": "task_master_notify2",
+    "task": "fc_agent.tasks.master_notify2",
     "schedule": "*/10 8-18 * * *",
     "_schedule": "每天的 8 点到 18 点，每隔 10 分钟执行一次",
     "args": [1, 16],

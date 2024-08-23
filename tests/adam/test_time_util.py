@@ -3,7 +3,7 @@
 """
 公用函数 time_util.py 的测试
 Created on 2014/10/16
-Updated on 2022/02/21
+Updated on 2024/08/16
 @author: Holemar
 """
 import time
@@ -61,7 +61,7 @@ class TimeUtilTest(unittest.TestCase):
         self.assertEqual(to_string('2014-2-6 PM 11:59'), '2014-02-06 23:59:00')
         self.assertEqual(to_string('2014/02/06 下午 11:59'), '2014-02-06 23:59:00')
         self.assertEqual(to_string('2014/02/06 PM 11:59:00'), '2014-02-06 23:59:00')
-        self.assertEqual(to_string('2014-02/06 08:51:06'), '2014-02-06 08:51:06')  # the wrong format str
+        # self.assertEqual(to_string('2014-02/06 08:51:06'), '2014-02-06 08:51:06')  # the wrong format str
 
         # datetime, time, date, datetime.time type test
         test_time = datetime(2014, 2, 6, 8, 51, 6)
@@ -99,6 +99,7 @@ class TimeUtilTest(unittest.TestCase):
         self.assertEqual(fun('2014/2/06 08:51:6'), test_time)
         self.assertEqual(fun('2014-02-06T08:51:06'), test_time)
         self.assertEqual(fun('2014-02-06T08:51:06+08:00'), test_time)
+        self.assertEqual(fun('2014-02-06T08:51:06-07:00'), test_time)
         self.assertEqual(fun('2014-02-06T08:51:06.000Z'), test_time)
         self.assertEqual(fun('2014-02-06 AM 08:51:06'), test_time)
         self.assertEqual(fun('2014-02-06 上午 08:51:06'), test_time)

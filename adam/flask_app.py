@@ -52,7 +52,7 @@ class Adam(Flask):
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
         cur_dir = os.path.dirname(__file__)
-        logger.info('Init Adam2')
+        logger.info('Init Adam')
         self.current_file_dir = os.path.abspath(cur_dir)
         self.root = root or os.getcwd()  # 当前目录
 
@@ -90,7 +90,6 @@ class Adam(Flask):
         self.views = {}
         self.models = {}
         self.middlewares = {}
-        self.tasks = {}
 
         # 加载model
         self.load_models(model_path)
@@ -151,7 +150,6 @@ class Adam(Flask):
             print('views:', self.views)
             print('models:', self.models)
             print('middlewares:', self.middlewares)
-            print('tasks:', self.tasks)
         elif args.mode == 'api':
             host = os.environ.get('HOST') or '0.0.0.0'
             port = int(os.environ.get('PORT') or '8000')
