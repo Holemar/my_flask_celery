@@ -34,7 +34,7 @@ class TokenBackend(BasicBackend):
         # 初始化
         request.jwt = None
         request.user = None
-        request.original_user = None
+        request.session = None
 
         if credential:
             try:
@@ -55,7 +55,6 @@ class TokenBackend(BasicBackend):
                         request.session = session_object
                         user = user_mode.objects(id=session_object.user.id).first()
                         request.user = user
-                        request.original_user = user
                     # else:
                     #     abort(401, description='token does not exists')
             except (jwt.DecodeError, jwt.ExpiredSignatureError) as ex:
@@ -68,28 +67,13 @@ class TokenBackend(BasicBackend):
         """ This function is called to check if a token is valid. Must be
         overridden with custom logic.  Default behavior, pass if jwt is verified.
 
-        :param token: decoded user name.
+        :param credential: decoded user name.
         :param allowed_roles: allowed user roles
         :param resource: resource being requested.
         :param method: HTTP method being executed (POST, GET, etc.)
         """
-        # tokens = app.data.driver.db['token']
-        # users = app.data.driver.db['user']
-
-        # token_object = tokens.find_one({'token': credential['token']})
-
-        # if not token_object:
-        #     abort(401, description='Invalid Token')
-        
-        # user_object = users.find_one({'_id': token_object['user_id']})
-
-        # if not token_object or not user_object:
-        #     abort(401, description='Invalid Token')
-        
-        # request.user = user_object
-        # request.token = token_object
-        # request.jwt = credential['jwt']
-
-        # self.lookup_license(user_id=user_object['_id'])
+        # user = request.user
+        # jwt_object = request.jwt
+        # session = request.session
         return True
 

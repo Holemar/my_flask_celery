@@ -52,7 +52,7 @@ class Adam(Flask):
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
         cur_dir = os.path.dirname(__file__)
-        logger.info('Init Adam2')
+        logger.info('Init Adam')
         self.current_file_dir = os.path.abspath(cur_dir)
         self.root = root or os.getcwd()  # 当前目录
 

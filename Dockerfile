@@ -1,9 +1,9 @@
-FROM python:3.7
+FROM python:3.11
 
 COPY . /src
 WORKDIR /src
 
 RUN pip3 install -r requirements.txt
 
-CMD ["python", "main.py"]
+CMD ["python3", "main.py", "-m", "api"]
 

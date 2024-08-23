@@ -20,6 +20,11 @@ pymongo==4.8.0
 mongoengine==0.28.2
 redis==5.0.7
 
+# 安装 SQLAlchemy(使用 sqlite 作为 clery 数据储存时必须用 SQLAlchemy)
+greenlet==3.0.3
+typing-extensions==4.12.2
+SQLAlchemy==2.0.32
+
 # flask 安装的依赖
 Jinja2==3.1.4
 MarkupSafe==2.1.5
@@ -32,7 +37,8 @@ itsdangerous==2.2.0
 pyjwt==2.9.0
 # requests 安装的依赖
 certifi==2024.7.4
-charset-normalizer==3.3.2
+charset-normalizer==3.1.0
+# charset-normalizer==3.3.2 # 这版本会导致bug
 idna==3.7
 requests==2.32.3
 urllib3==2.2.2
