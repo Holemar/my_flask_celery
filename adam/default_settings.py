@@ -214,7 +214,7 @@ class CELERY_CONFIG(object):
     task_default_queue = os.environ.get('CELERY_DEFAULT_QUEUE', 'default')  # 默认队列
     result_expires = int(os.environ.get('CELERY_TASK_RESULT_EXPIRES', 3600))  # 任务结果过期时间，单位秒
     task_time_limit = int(os.environ.get('CELERYD_TASK_TIME_LIMIT', 0)) or None  # 规定完成任务的时间，单位秒。在指定时间内完成任务，否则执行该任务的worker将被杀死，任务移交给父进程
-    worker_max_tasks_per_child = int(os.environ.get('CELERYD_MAX_TASKS_PER_CHILD', 0)) or None  # 每个worker执行了多少任务就会死掉，默认是无限的
+    worker_max_tasks_per_child = int(os.environ.get('CELERYD_MAX_TASKS_PER_CHILD', 100)) or None  # 每个worker执行了多少任务就会死掉，默认是无限的。可防止内存泄露
     task_acks_late = os.environ.get('CELERY_ACKS_LATE', 'false').lower() in ('true', '1')  # 任务发送完成是否需要确认，这一项对性能有一点影响
 
     timezone = 'Asia/Shanghai'  # 设置时区

@@ -1,33 +1,113 @@
 # -*- coding: utf-8 -*-
 import os
+import sys
 import json
+import time
+import socket
 import logging
 import inspect
 import importlib
 
+from celery import Celery
 from celery import current_app, Task
 from celery.schedules import crontab
 
+from models.work_status import WorkStatus
 from .import_util import import_submodules, discovery_items_in_package
-from .str_util import base64_decode
+from .str_util import base64_decode, decode2str
 from .json_util import load_json
 from .config_util import config
 from .db_util import get_mongo_db, get_redis_client
 
 
+# 上次写入检测信息时间，避免频繁操作
+LAST_RUN = None
+# beat/worker记录超时时间，beat每分钟会运行一次
+TIME_OUT = 360
+
+HOST_NAME = socket.gethostname()
+PID = os.getpid()  # 当前进程ID
+
 logger = logging.getLogger(__name__)
 
-'''
+
 def custom_send_task(self, *args, **kwargs):
     """celery 发任务补丁,每个beat及worker子任务执行前都经过它"""
-    logger.info(f'celery.Celery.send_task args:{args}, kwargs:{kwargs}')
+    logger.debug(f'celery.Celery.send_task args:{args}, kwargs:{kwargs}')
+    set_run()
     return self._old_send_task(*args, **kwargs)
 
+
+# 打补丁的方式来监控 beat 和 worker，虽然比较难看，但 flower 那种使用线程不断轮询的方式也不见得好多少。
+# 这种方式的弊端是，一个长任务的执行中途(远远超过了这里的超时时间)，会没统计到。
 if not hasattr(Celery, '_old_send_task'):
     _old_send_task = getattr(Celery, 'send_task')
     setattr(Celery, '_old_send_task', _old_send_task)
     setattr(Celery, 'send_task', custom_send_task)
-# '''
+
+
+'''
+from celery.task import Task
+
+def custom_task_call(self, *args, **kwargs):
+    """celery 执行任务补丁，主要是worker主任务执行前经过它"""
+    set_run()
+    return self._old_call(*args, **kwargs)
+
+# __call__ 函数补丁，会导致出错重试机制失效，故去掉
+_old_call = getattr(Task, '__call__')
+setattr(Task, '_old_call', _old_call)
+setattr(Task, '__call__', custom_task_call)
+setattr(Task, '_Task__call__', custom_task_call)
+'''
+
+
+def get_argv_queue(argv):
+    """获取运行参数中指定的Q值"""
+    if '-Q' not in argv:
+        return 'ALL_QUEUES'
+    index = argv.index('-Q')
+    param = argv[index + 1]
+    queues = param.split(',')
+    if set(queues) == set(config.ALL_QUEUES):
+        return 'ALL_QUEUES'
+    return param
+
+
+def set_run():
+    """设置运行状态
+    任务需要长时间运行(超过这里设置的TIME_OUT)，则需要在过期前设置此进程的运行状态，避免任务执行太久导致误认为僵死(会有系统定时任务重启僵死进程)
+    """
+    global LAST_RUN, TIME_OUT
+    if LAST_RUN is None or (time.time() - LAST_RUN) > (TIME_OUT / 3):
+        LAST_RUN = time.time()
+        # beat 正常运行
+        if 'beat' in sys.argv:
+            WorkStatus.now_run('celery_beat')
+        # worker 正常运行
+        elif 'worker' in sys.argv:
+            queues = get_argv_queue(sys.argv)
+            WorkStatus.now_run(f'celery_worker:{queues}:{HOST_NAME}_{PID}')
+
+
+def get_workers():
+    """获取worker正常运行的数量"""
+    keys = WorkStatus.run_names('celery_worker:', TIME_OUT)
+    result = {}
+    for key in keys:
+        key = decode2str(key)  # redis 返回 byte 类型，兼容一下
+        queue = key.split(':')[1]
+        if queue not in result:
+            result[queue] = 1
+        else:
+            result[queue] += 1
+    return result
+
+
+def get_beat():
+    """获取beat运行状态，运行正常则返回OK，否则返回ERROR"""
+    res = WorkStatus.is_run('celery_beat', TIME_OUT)
+    return 'OK' if res else 'ERROR'
 
 
 def set_base_task():
