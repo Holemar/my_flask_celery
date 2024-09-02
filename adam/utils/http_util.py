@@ -7,14 +7,13 @@ import ssl
 import json
 import logging
 
-from urllib.parse import urlencode
-from urllib.parse import unquote
+from urllib.parse import urlencode, unquote
 import urllib.request as request
 
 from .str_util import gzip_decode, zlib_decode, decode2str
 
 
-__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host')
+__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params')
 
 
 context = ssl._create_unverified_context()
@@ -191,3 +190,36 @@ def get_host(url):
     """
     us = url.split('/')
     return us[2]
+
+
+def get_request_params(url):
+    """
+    获取url里面的参数,以字典的形式返回
+    :param {string} url: 请求地址
+    :return {dict}: 以字典的形式返回请求里面的参数
+    """
+    result = {}
+    if isinstance(url, (bytes, bytearray)):
+        url = decode2str(url)
+    if not isinstance(url, str):
+        if isinstance(url, dict):
+            return url
+        else:
+            return result
+
+    # li = re.findall(r'\w+=[^&]*', url) # 为了提高效率，避免使用正则
+    i = url.find('?')
+    if i != -1:
+        url = url[i + 1:]
+    li = url.split('&')
+
+    if not li:
+        return result
+
+    for ns in li:
+        if not ns: continue
+        (key, value) = ns.split('=', 1) if ns.find('=') != -1 else (ns, '')
+        value = value.replace('+', ' ')  # 空格会变成加号
+        result[key] = unquote(value)  # 值需要转码
+
+    return result

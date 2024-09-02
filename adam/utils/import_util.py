@@ -25,7 +25,7 @@ def import_submodules(package, recursive=True):
         try:
             results[full_name] = importlib.import_module(full_name)
         except Exception as e:
-            logger.warning('Failed to import %s: %s', full_name, e)
+            logger.exception('Failed to import %s: %s', full_name, e)
         if recursive and is_pkg:
             results.update(import_submodules(full_name))
     return results

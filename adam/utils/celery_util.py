@@ -12,12 +12,12 @@ from celery import Celery
 from celery import current_app, Task
 from celery.schedules import crontab
 
-from models.work_status import WorkStatus
 from .import_util import import_submodules, discovery_items_in_package
 from .str_util import base64_decode, decode2str
 from .json_util import load_json
 from .config_util import config
 from .db_util import get_mongo_db, get_redis_client
+from ..models.work_status import WorkStatus
 
 
 # 上次写入检测信息时间，避免频繁操作

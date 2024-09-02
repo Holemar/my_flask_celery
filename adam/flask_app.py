@@ -51,11 +51,10 @@ class Adam(Flask):
         global current_app
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
-        cur_dir = os.path.dirname(__file__)
         logger.info('Init Adam')
-        self.current_file_dir = os.path.abspath(cur_dir)
-        self.root = root or os.getcwd()  # 当前目录
-
+        cur_dir = os.path.dirname(__file__)
+        self.current_file_dir = os.path.abspath(cur_dir)  # 当前文件所在目录
+        self.root = root or os.getcwd()  # 项目启动目录
 
         if root:
             # 引入项目根目录以及lib跟目录
@@ -71,6 +70,8 @@ class Adam(Flask):
         super().__init__(import_name, **kwargs)
 
         self.settings = settings
+        self.view_path = view_path
+        self.middleware_path = middleware_path
         self.load_config()
 
         # name
@@ -94,40 +95,14 @@ class Adam(Flask):
         # 加载model
         self.load_models(model_path)
 
-        # 加载view
-        self.load_views(view_path)
-
-        load_middlewares = [
-            'TokenMiddleware',
-            'CorsMiddleware'
-        ]
-        for oth_midd in self.config.get('MIDDLEWARS', []):
-            if oth_midd not in load_middlewares:
-                load_middlewares.append(oth_midd)
-        self.available_middlewares = []
-        self.load_middleware(middleware_path)
-
-        # 加载自定义中间件
-        for middleware in load_middlewares:
-            if middleware in self.middlewares:
-                self.available_middlewares.append(self.middlewares[middleware])
-                logger.debug('Register middleware %s', middleware)
-            else:
-                logger.error('unregistered middleware %s', middleware)
-
-        self.auth_backends = []
-        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['adam.auth.token_backend']:
-            auth_module = importlib.import_module(ab)
-            is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
-            clsmembers = inspect.getmembers(auth_module, is_class_member)
-            self.auth_backends.append(clsmembers[0][1]())
-
+        # 加载celery(api端启动时也需要加载，让接口能抛出异步任务)
         if enable_celery:
             self.celery = celery.Celery(self.name)
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
 
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
             celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
+
         current_app = self
 
     def run(self, debug=None, **options):
@@ -143,6 +118,39 @@ class Adam(Flask):
         parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
         add_file_handler(args.logfile, args.loglevel)
+
+        if args.mode in ('route', 'api'):
+            # 加载view
+            self.load_views(self.view_path)
+
+            load_middlewares = [
+                'TokenMiddleware',
+                'CorsMiddleware'
+            ]
+            for oth_midd in self.config.get('MIDDLEWARS', []):
+                if oth_midd not in load_middlewares:
+                    load_middlewares.append(oth_midd)
+            self.available_middlewares = []
+            self.load_middleware(self.middleware_path)
+
+            # 加载自定义中间件
+            for middleware in load_middlewares:
+                if middleware in self.middlewares:
+                    self.available_middlewares.append(self.middlewares[middleware])
+                    logger.debug('Register middleware %s', middleware)
+                else:
+                    logger.error('unregistered middleware %s', middleware)
+
+            self.auth_backends = []
+            for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['adam.auth.token_backend']:
+                auth_module = importlib.import_module(ab)
+                is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
+                clsmembers = inspect.getmembers(auth_module, is_class_member)
+                self.auth_backends.append(clsmembers[0][1]())
+
+            with self.app_context():
+                # 注册特殊页面(首页、静态文件、status、错误处理等)
+                from .views import index, error_handler
 
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
@@ -231,7 +239,8 @@ class Adam(Flask):
         load all model logic
         """
         lookup_model = lambda x: inspect.isclass(x) and x != ResourceDocument and issubclass(x, ResourceDocument)
-        self.models = load_modules(path, lookup_model)
+        self.models = load_modules('adam.models', lookup_model)
+        self.models.update(load_modules(path, lookup_model))
 
     def load_middleware(self, path):
         """

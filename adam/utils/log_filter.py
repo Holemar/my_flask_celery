@@ -176,7 +176,7 @@ class DbHandler(logging.Handler):
 
     def emit(self, record):
         """日志输出"""
-        from models.log import Log
+        from ..models.log import Log
         # 存储不被截取的log消息
         msg = getattr(record, 'old_msg', record.getMessage())
         Log.add(record, msg)

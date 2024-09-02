@@ -16,7 +16,7 @@ class Config(object):
             return app.config.get(name)
         except:
             # fallback to the module-level default value
-            return os.environ
+            return os.environ.get(name)
 
 
 # makes an instance of the Config helper class available to all the modules

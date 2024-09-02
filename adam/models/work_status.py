@@ -1,8 +1,8 @@
 # -*- coding:utf-8 -*-
 import datetime
-from mongoengine.fields import IntField, StringField, DateTimeField
+from mongoengine.fields import StringField, DateTimeField
 
-from adam.documents import ResourceDocument
+from ..documents import ResourceDocument
 
 
 class WorkStatus(ResourceDocument):
