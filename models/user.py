@@ -1,6 +1,6 @@
 # -*- coding:utf-8 -*-
 
-from adam.documents import ResourceDocument, CommonException
+from adam.documents import ResourceDocument, BaseError
 from adam.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
                          RelationField, DictField)
 from .enums import UserEnum
@@ -11,7 +11,7 @@ class User(ResourceDocument):
 
     meta = {
         'hidden': ['password'],
-        'allow_inheritance': True,
+        # 'allow_inheritance': True,
         'search_fields': ['email', 'mobile'],
         "included_fields": ["email", "mobile", "name"]
     }
@@ -55,7 +55,11 @@ class User(ResourceDocument):
 
     def soft_delete(self):
         if self.is_delete:
-            raise CommonException(400, '该用户已经被删除，请勿重复删除')
+            BaseError.user_deleted('该用户已经被删除，请勿重复删除')
         self.is_delete = True
         self.save()
+        return True
+
+    def has_permission(self, endpoint, instance=None):
+        """检查用户是否有权限访问某个接口."""
         return True

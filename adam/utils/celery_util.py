@@ -110,22 +110,18 @@ def get_beat():
     return 'OK' if res else 'ERROR'
 
 
-def set_base_task():
-    """重新赋予基类"""
-    from ..celery_base_task import BaseTask
-    current_app.Task = BaseTask
-
-
 def load_task(path):
     """
     load class tasks
     """
-    set_base_task()  # 重新赋予基类，必须在task注册之前，才可以使task继承基类
+    # 重新赋予基类，必须在task注册之前，才可以使task继承基类
+    from ..celery_base_task import BaseTask
+    current_app.Task = BaseTask
 
     package_name = path.replace('/', '.')
     package = importlib.import_module(package_name)
-    customize_tasks = discovery_items_in_package(package,
-                                                 lambda x: inspect.isclass(x) and x != Task and issubclass(x, Task))
+    func_lookup = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
+    customize_tasks = discovery_items_in_package(package, func_lookup)
     for _n, _task_cls in customize_tasks:
         logger.debug('Loading Task (CLS): %s', _n)
         _task = _task_cls()

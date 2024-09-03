@@ -208,8 +208,10 @@ class Adam(Flask):
             acl = cls_view.acl
             routes = {}
             bp = inspect.getmembers(module, lookup_bp)
+            bp_obj = bp[0][1] if bp else None
             if bp:
-                routes = bp[0][1].routes
+                routes.update(bp_obj.routes)
+                acl.extend(bp_obj.acl)
 
             # check alias
             cls_parent = cls_view.__bases__[0]
@@ -220,9 +222,9 @@ class Adam(Flask):
                 bp = inspect.getmembers(sys.modules[cls_parent.__module__], lookup_bp)
                 if bp:
                     routes = {
-                        'item': {**routes['item'], **bp[0][1].routes['item']},
-                        'collection': {**routes['collection'], **bp[0][1].routes['collection']},
-                        'remote_item': {**routes['remote_item'], **bp[0][1].routes['remote_item']}
+                        'item': {**routes['item'], **bp_obj.routes['item']},
+                        'collection': {**routes['collection'], **bp_obj.routes['collection']},
+                        'remote_item': {**routes['remote_item'], **bp_obj.routes['remote_item']}
                     }
 
             model = self.models.get(resource)

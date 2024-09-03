@@ -11,22 +11,12 @@ import logging
 from flask import request
 
 from ..utils.config_util import config
+from ..utils.url_util import get_param
 from .base import Middleware
 
 # api 超时警告时间，单位：秒
 API_WARN_TIME = float(os.environ.get('API_TIMEOUT') or 1)
 logger = logging.getLogger(__name__)
-
-
-def get_param():
-    """获取参数"""
-    try:
-        post_data = request.data
-        if post_data and isinstance(post_data, (bytes, bytearray)):
-            post_data = post_data.decode()
-        return post_data
-    except:
-        return None
 
 
 class CorsMiddleware(Middleware):

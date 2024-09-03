@@ -2,3 +2,4 @@
 from .base import IDocument
 from .resource_document import ResourceDocument
 from .exceptions import CommonException, BussinessCommonException
+from .error_codes import BaseError

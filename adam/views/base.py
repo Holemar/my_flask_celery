@@ -18,17 +18,17 @@ from urllib.parse import quote
 
 import mongoengine
 from mongoengine import Document
-from flask import request, abort, Response
+from flask import request, Response
 from flask import current_app as app
 from bson import ObjectId
 from mongoengine.queryset.visitor import Q
 from mongoengine.fields import LazyReferenceField, ReferenceField
-from werkzeug.exceptions import NotFound, Unauthorized, Forbidden, BadRequest
+from werkzeug.exceptions import NotFound, Unauthorized, BadRequest, HTTPException
 
-from ..documents import CommonException, BussinessCommonException
+from ..documents import CommonException, BussinessCommonException, BaseError
 from ..utils.serializer import serialize, dict_to_mongo, mongo_to_dict
+from ..utils.url_util import parse_request, payload, get_param
 from ..fields import RelationField
-from ..utils.url_util import parse_request, payload
 from ..documents.base import IDocument
 from .blueprint import return_data
 
@@ -39,17 +39,11 @@ _env = os.environ.get('ENV') or 'development'
 class ResourceView(object):
     """
     ResourceView, 实现资源类的控制器逻辑（CRUD）
-        acl = [
-            {
-                'property': 'find',
-                'principal': '$owner',
-                'permission': 'allow'
-            }
-        ]
+        acl = ['collection_read', 'item_read', 'item_reference_create', ...]
     """
     model = None
     app = None
-    acl = []
+    acl = []  # 需要控制权限的 action 列表
 
     meta = {
         'datasource': 'mongodb',
@@ -128,7 +122,7 @@ class ResourceView(object):
                 current = mw(current)
             result = current()
         except Exception as ex:
-            result = self.render_error(400, str(ex), ex)
+            result = self.render_error(400, getattr(ex, 'message', str(ex)), ex)
         return result
 
     def _patch_where(self):
@@ -194,7 +188,7 @@ class ResourceView(object):
                 req = parse_request(self.model)
                 request.req = req
                 endpoint = request.endpoint
-                source, action, _, _ = endpoint.split('|')
+                _source, action, _view_name, _item_reference = endpoint.split('|')
                 is_collection = action.startswith('collection')
                 is_item = action.startswith('item')
                 is_batch = action.startswith('batch')
@@ -212,7 +206,7 @@ class ResourceView(object):
                         handler = self.routes['remote_item'][real_action]['function_name']
                     else:
                         logger.error('Unknow handler %s', action)
-                        abort(400, 'Bad Request')
+                        BaseError.handle_error('Unknow handler %s' % action)
                 else:
                     handler = action
                 if handler:
@@ -232,20 +226,20 @@ class ResourceView(object):
                             elif id_field != 'id':
                                 item_condition[id_field] = kwargs['id']
                             else:
-                                raise NotFound
+                                BaseError.data_not_exist()
                             if not self.model:
-                                abort(400, 'Bad Request')
+                                BaseError.data_not_exist()
                             instance = self.model.find_one(item_condition)
                             if not instance:
-                                raise NotFound
+                                BaseError.data_not_exist()
                             kwargs['instance'] = instance
                             del kwargs['id']
                     if not self.has_permission(action, endpoint, instance) and not app.config.get('DEBUG'):
-                        raise Forbidden
+                        BaseError.forbidden()
                     function = getattr(self, handler)
                     response = function(**kwargs)
                 else:
-                    raise NotFound
+                    BaseError.data_not_exist()
             if isinstance(response, Response):
                 return response
             elif isinstance(response, requests.models.Response):
@@ -254,20 +248,26 @@ class ResourceView(object):
             else:
                 return self.render_obj(response)
         except mongoengine.queryset.DoesNotExist as ex:
-            return self.render_error(400, '不存在', ex)
+            return self.render_error(404, '数据不存在', ex)
         except Unauthorized as ex:
             return self.render_error(401, '未授权', ex)
         except NotFound as ex:
-            return self.render_error(400, '不存在', ex)
+            return self.render_error(404, '数据不存在', ex)
         except BadRequest as ex:
             return self.render_error(ex.code, ex.description)
+        except HTTPException as ex:
+            if ex.response:
+                logger.exception("请求异常 %s %s: %s: %s，参数:%s",
+                                 request.method, request.full_path, ex, ex.description, get_param())
+                return ex.get_response()
+            else:
+                return self.render_error(405, 'view处理异常', ex)
         except BussinessCommonException as ex:
             return self.render_bussiness_error(ex)
         except CommonException as ex:
             return self.render_error(ex.code, ex.message)
         except Exception as ex:
-            logger.error(ex)  # render_error 里会单独打印call stack,这里就不用exception了,
-            return self.render_error(400, '未知错误', ex)
+            return self.render_error(500, '未知错误', ex)
 
     def render_obj(self, obj):
         included = None
@@ -279,36 +279,35 @@ class ResourceView(object):
         elif isinstance(obj, Document):
             obj = return_data(data=obj)
         response = serialize('_root', obj, None, included=included)
-        ua = request.headers.get('User-Agent')
-        # ugly fix for IE
-        mimetype = 'text/html' if (ua and re.search(r'MSIE\s[6-9]', ua)) else 'application/json'
-        return Response(json.dumps(response), status=200, mimetype=mimetype)
+        return Response(json.dumps(response), status=200, mimetype='application/json')
     
     def render_bussiness_error(self, exception):
-        ua = request.headers.get('User-Agent')
-        # ugly fix for IE
-        mimetype = 'text/html' if re.search(r'MSIE\s[6-9]', ua) else 'application/json'
-        return Response(str(exception), status=exception.status_code, mimetype=mimetype)
+        if _env != 'production' and not exception.data:
+            # traceback.print_exc()
+            callstack = traceback.format_exc().splitlines()
+            exception.data = {'detail': str(exception), 'callstack': callstack}
+
+        res = return_data(code=exception.code, message=exception.message, data=exception.data)
+        logger.error(res, exc_info=exception)
+        return Response(json.dumps(res), status=exception.status_code, mimetype='application/json')
 
     def render_error(self, code, message, ex=None):
-        detail = None
-        callstack = None
+        data = None
         if ex:
+            callstack = None
             if hasattr(ex, 'code') and ex.code:
                 code = ex.code
             detail = str(ex)
-            traceback.print_exc()
+            # traceback.print_exc()
             if _env != 'production':
                 callstack = traceback.format_exc().splitlines()
+            data = {'detail': detail, 'callstack': callstack}
 
-        data = {'detail': detail, 'callstack': callstack}
-        error = return_data(code=code, message=message, data=data)
-        logger.error(error)
+        res = return_data(code=code, message=message, data=data)
+        # logger.error(res, exc_info=ex)
+        logger.exception("请求异常 %s %s: %s，参数:%s", request.method, request.full_path, ex, get_param())
 
-        ua = request.headers.get('User-Agent')
-        # ugly fix for IE
-        mimetype = 'text/html' if re.search(r'MSIE\s[6-9]', ua) else 'application/json'
-        return Response(json.dumps(error), status=code, mimetype=mimetype)
+        return Response(json.dumps(res), status=400, mimetype='application/json')
 
     def has_permission(self, action, endpoint, instance=None):
         """
@@ -320,9 +319,12 @@ class ResourceView(object):
                 'allow': True
             }
         """
-        # TODO: 权限判断
         user = getattr(request, 'user', None)
-        _, action, _, _ = request.endpoint.split('|')
+        if self.acl and action in self.acl:
+            if not user:
+                BaseError.no_user()
+            if hasattr(user, 'has_permission'):
+                return user.has_permission(endpoint, instance)
         return True
 
     def options(self):
@@ -541,7 +543,7 @@ class ResourceView(object):
                         else:
                             o = self.app.models[field_cls_name].objects(id=v).first()
                         if not o:
-                            abort(400, "%s资源不存在" % field_cls_name)
+                            BaseError.data_not_exist(message="%s资源不存在" % field_cls_name)
                     instance[k] = o
 
         user = request.user if hasattr(request, 'user') else None
@@ -598,7 +600,7 @@ class ResourceView(object):
         embedded = request.endpoint.split('|')[-1]
         embedded_field = instance._fields.get(embedded).field
         if len(instance[embedded]) < index:
-            abort(400, 'Out of Range')
+            BaseError.data_not_exist('Out of Range')
         instance.save()
         del instance[embedded][index]
         instance.save()
@@ -613,7 +615,7 @@ class ResourceView(object):
         embedded = request.endpoint.split('|')[-1]
         embedded_field = instance._fields.get(embedded).field
         if len(instance[embedded]) < index:
-            abort(400, 'Out of Range')
+            BaseError.data_not_exist('Out of Range')
         update = embedded_field.document_type(**data)
         instance[embedded][index] = update
         instance.save()
@@ -628,7 +630,7 @@ class ResourceView(object):
         reference_field = instance._fields.get(reference)
         current_reference = instance[reference]
         if current_reference:
-            abort(400, 'Reference Exist')
+            BaseError.data_not_exist()
         reference_instance = reference_field.document_type(**data)
         if hasattr(request, 'user') and self.model._fields.get('user'):
             reference_instance.user = request.user
@@ -676,7 +678,7 @@ class ResourceView(object):
         method = request.args.get('method') or 'inline'
         response = file_proxy.read()
         if not response:
-            abort(400, 'Not Exist')
+            BaseError.data_not_exist()
 
         content_disposition = method
         if file_proxy.name:
@@ -776,7 +778,7 @@ class ResourceView(object):
         method = request.args.get('method') or 'inline'
         response = file_proxy.read(cos_id)
         if not response:
-            abort(400, 'Not Exist')
+            BaseError.data_not_exist()
 
         content_disposition = response['meta']['Content-Disposition']
         if file_proxy.name:

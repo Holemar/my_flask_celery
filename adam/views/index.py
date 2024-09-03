@@ -15,6 +15,12 @@ def index():
     return current_app.send_static_file('index.html')
 
 
+@current_app.route('/index/<path:filename>')
+def front_page(filename):
+    """与前端做约定，前端页面请求的路径为 /index/xxx """
+    return current_app.send_static_file('index.html')
+
+
 @current_app.route('/status')
 def status():
     """用于查看程序运行状态。任务堆积情况等"""

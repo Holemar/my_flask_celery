@@ -1,0 +1,21 @@
+# -*- coding:utf-8 -*-
+
+
+from __init__ import get, post, set_host  # 导入环境
+
+
+def get_status():
+    uri = 'status'
+    response = get(uri, param={
+        'url': 1,
+        'models': 0,
+        'config': 0
+    })
+    print(response)
+
+
+if __name__ == '__main__':
+    # set_host('http://localhost:8000/')
+    set_host('http://54.219.179.117:8134/')  # 线上环境
+
+    get_status()
