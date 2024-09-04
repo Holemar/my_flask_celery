@@ -5,7 +5,7 @@ import logging
 from flask import jsonify, request, current_app
 from ..utils.config_util import config
 from ..utils.json_util import json_serializable
-from ..utils.celery_util import get_pending_msg, get_beat, get_workers
+from ..utils.celery_util import get_pending_msg, get_beat, get_workers, get_beat_schedule
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +37,22 @@ def status():
         message['now'] = time.strftime('%Y-%m-%d %H:%M:%S')  # 系统时间,用来核对系统时间是否正确
 
         data = request.args
-        # 参数控制查看内容, 如： http://127.0.0.1:8000/status?url=1&models=1&config=1
-        if data.get('route') or data.get('url'):
+        # 参数控制查看内容, 如： http://127.0.0.1:8000/status?url=1&models=1&config=1&beat=1
+        if data.get('route') or data.get('url'):  # 查看所有的 api 路由
             message['route'] = list(repr(n) for n in current_app.url_map.iter_rules())
+        # 查看所有的数据库 model
         if data.get('models'):
             message['models'] = list(current_app.models.keys())
-        if data.get('config'):
+        # 查看所有的配置 (settings + default_settings)
+        if data.get('config'):  # 查看所有的配置
             values = {k: json_serializable(v) for k, v in current_app.config.items()}
             # 内嵌类，需要额外读取
             c_config = current_app.config['CELERY_CONFIG']
             values['CELERY_CONFIG'] = {k: getattr(c_config, k) for k in dir(c_config) if not k.startswith('__')}
             message['config'] = values
+        # 查看所有的 beat 定时任务配置
+        if data.get('beat'):
+            message['beat_schedule'] = get_beat_schedule()
 
         message['duration'] = time.time() - start_time  # 本接口查询耗时
     except Exception as e:

@@ -21,6 +21,8 @@ from ..models.work_status import WorkStatus
 LAST_RUN = None
 # beat/worker记录超时时间，beat每分钟会运行一次
 TIME_OUT = 360
+# 定时任务配置
+BEAT_SCHEDULE = {}
 
 HOST_NAME = socket.gethostname()
 PID = os.getpid()  # 当前进程ID
@@ -107,10 +109,24 @@ def get_beat():
     return 'OK' if res else 'ERROR'
 
 
+def get_beat_schedule():
+    """获取celery的定时任务配置"""
+    global BEAT_SCHEDULE
+    beat_schedule = {}
+    for task_name, item_schedule in BEAT_SCHEDULE.items():
+        schedule_config = item_schedule.copy()
+        schedule = schedule_config['schedule']
+        if not isinstance(schedule, (int, str)):
+            schedule_config['schedule'] = repr(schedule)
+        beat_schedule[task_name] = schedule_config
+    return beat_schedule
+
+
 def load_task(path):
     """
     load class tasks
     """
+    global BEAT_SCHEDULE
     # 重新赋予基类，必须在task注册之前，才可以使task继承基类
     from ..celery_base_task import BaseTask
     current_app.Task = BaseTask
@@ -136,7 +152,8 @@ def load_task(path):
         beat_schedule = getattr(_cls, 'SCHEDULE', None)
         if task_name and beat_schedule:
             beat_schedule['task'] = task_name
-            current_app.conf.beat_schedule[task_name] = beat_schedule
+            BEAT_SCHEDULE[task_name] = beat_schedule
+    current_app.conf.beat_schedule = BEAT_SCHEDULE
 
 
 def delete_repeat_task():
