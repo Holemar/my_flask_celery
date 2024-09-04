@@ -165,6 +165,9 @@ RATE_LIMIT_DELETE = None
 
 LICENSE_LIMIT = []
 
+# 接口返回值长度限制(1MB)
+MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH') or 1024 * 1024)
+
 # disallow Mongo's javascript queries as they might be vulnerable to injection
 # attacks ('ReDoS' especially), are probably too complex for the average API
 # end-user and finally can  seriously impact overall performance.
