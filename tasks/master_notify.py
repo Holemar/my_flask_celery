@@ -25,16 +25,13 @@ SCHEDULE = {
 class NotifyTask(BaseTask, ABC):
     name = f'{settings.APP_NAME}.{__name__}'
 
-    def run(self):
-        _id = uuid.uuid4()
-        _t = int(time.time())
+    def run(self, _id=None, _t=None):
+        _id = _id or uuid.uuid4()
+        _t = _t or int(time.time())
         retries = int(self.request.retries)  # 重试次数
         logger.info(f'NotifyTask task run id: {_id}, ts:{_t}, 重试次数: {retries}')
-        # 观察异常情况、重试情况
-        if retries <= 2:
-            a = 1 / 0
-        else:
-            return True
+        return True
+        # if retries <= 2: a = 1 / 0  # 观察异常情况、重试情况
 
 
 ''' NotifyTask.run 函数可以代替下面写法

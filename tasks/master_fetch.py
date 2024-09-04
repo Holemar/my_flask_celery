@@ -1,19 +1,20 @@
 # -*- coding:utf-8 -*-
-import time
 import uuid
 import logging
 from datetime import datetime
+from celery.schedules import crontab
 
-from celery import current_app
 import settings
+from celery import current_app
 from tasks.fetch import process as fetch_task
+from tasks.master_notify import NotifyTask
 
 logger = logging.getLogger(__name__)
 
 
 # 约定每个定时任务文件都需要定义一个 SCHEDULE 变量，用于定义定时任务(不定义这个变量则不认为是定时任务)
 SCHEDULE = {
-    "schedule": 5,  # 每 10 秒执行一次，也可以用 crontab 函数定义定时任务
+    "schedule": 5,  # 每 5 秒执行一次，也可以用 crontab 函数定义定时任务
     # 'schedule': crontab(minute='*/1'),  # 每分钟执行一次
 }
 
@@ -30,11 +31,13 @@ def process(self):
     使用self.request访问相关的属性，如：self.request.id, self.request.args, self.request.kwargs
     retries = int(self.request.retries)  # 重试次数
     """
-    _id = uuid.uuid4()
+    _id = uuid.uuid4()  # 测试这两种类型的异步任务传参
     _t = datetime.now()
     logger.info(f'master_fetch task id: {_id}, ts:{_t}')
 
-    fetch_task.delay([_id], _t)
+    fetch_task.delay([_id], _t)  # 调用 process 函数定义的异步任务
+    NotifyTask().delay([_id], _t)  # 调用继承 CeleryTask 类异步任务
+
     # task.delay():这是apply_async方法的别名,但接受的参数较为简单；
     # task.apply_async(args=[arg1, arg2], kwargs={key:value, key:value},
     #     countdown : 设置该任务等待一段时间再执行，单位为s；

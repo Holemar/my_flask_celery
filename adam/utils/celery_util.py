@@ -147,7 +147,7 @@ def load_task(path):
             current_app.register_task(_cls.process)
             task_name = _cls.process.name
         # 继承 Task 的类
-        if members:
+        elif members:
             _name, _task_cls = members[0]
             logger.debug('Loading Task (CLS): %s', _name)
             _task = _task_cls()
