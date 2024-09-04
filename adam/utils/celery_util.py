@@ -8,12 +8,14 @@ import inspect
 
 from celery import Celery
 from celery import current_app, Task
+from kombu.serialization import register
 
 from .import_util import import_submodules
 from .str_util import base64_decode, decode2str
 from .json_util import load_json
 from .config_util import config
 from .db_util import get_mongo_db, get_redis_client
+from .bson_util import bson_dumps, bson_loads
 from ..models.work_status import WorkStatus
 
 
@@ -26,6 +28,9 @@ BEAT_SCHEDULE = {}
 
 HOST_NAME = socket.gethostname()
 PID = os.getpid()  # 当前进程ID
+
+# 注册 celery 的 json 序列化
+register('json', bson_dumps, bson_loads, content_type='application/json', content_encoding='utf-8')
 
 logger = logging.getLogger(__name__)
 
