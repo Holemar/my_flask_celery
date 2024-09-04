@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 import os
 import sys
-import json
 import time
 import socket
 import logging
 import inspect
-import importlib
 
 from celery import Celery
 from celery import current_app, Task
-from celery.schedules import crontab
 
-from .import_util import import_submodules, discovery_items_in_package
+from .import_util import import_submodules
 from .str_util import base64_decode, decode2str
 from .json_util import load_json
 from .config_util import config

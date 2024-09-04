@@ -17,6 +17,7 @@ def import_submodules(package, recursive=True):
     :rtype: dict[str, types.ModuleType]
     """
     if isinstance(package, str):
+        package = package.replace('/', '.').replace(os.sep, '.')
         package = importlib.import_module(package)
     results = {}
     for _, name, is_pkg in pkgutil.walk_packages(package.__path__):
@@ -32,11 +33,10 @@ def import_submodules(package, recursive=True):
     return results
 
 
-def discovery_items_in_package(package, func_lookup=None):
+def discovery_items_in_package(package, func_lookup=inspect.isfunction):
     """
         discovery all function at most depth(2) in specified package
     """
-    func_lookup = func_lookup or inspect.isfunction
     functions = []
     _modules = import_submodules(package)
     for _k, _m in _modules.items():
