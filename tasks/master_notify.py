@@ -4,13 +4,24 @@ import uuid
 import logging
 from abc import ABC
 
+from celery.schedules import crontab
+
 import settings
 from adam.celery_base_task import BaseTask
 
-
 logger = logging.getLogger(__name__)
 
+# 约定每个定时任务文件都需要定义一个 SCHEDULE 变量，用于定义定时任务(不定义这个变量则不认为是定时任务)
+SCHEDULE = {
+    # "schedule": 10,  # 每 10 秒执行一次
+    'schedule': crontab(minute='*/1'),  # 每分钟执行一次
+    "args": (),  # 任务函数参数
+    "kwargs": {},  # 任务函数关键字参数
+    "options": {},  # 任务选项，比如 定义queue
+}
 
+
+# 这里是继承 CeleryTask 类的异步任务写法，需要重写 run 方法。
 class NotifyTask(BaseTask, ABC):
     name = "my_celery_mq.tasks.master_notify"
 

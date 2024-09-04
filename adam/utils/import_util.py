@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import re
 import logging
 import inspect
@@ -50,7 +51,7 @@ def load_modules(path, func_lookup=None):
     """
     models = {}
 
-    path = path.replace('/', '.')
+    path = path.replace('/', '.').replace(os.sep, '.')
     package = importlib.import_module(path)
     all_modules = discovery_items_in_package(package, func_lookup)
 

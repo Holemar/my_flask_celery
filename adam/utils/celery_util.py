@@ -118,52 +118,28 @@ def load_task(path):
     from ..celery_base_task import BaseTask
     current_app.Task = BaseTask
 
-    package_name = path.replace('/', '.')
-    package = importlib.import_module(package_name)
-    func_lookup = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
-    customize_tasks = discovery_items_in_package(package, func_lookup)
-    for _n, _task_cls in customize_tasks:
-        logger.debug('Loading Task (CLS): %s', _n)
-        _task = _task_cls()
-        current_app.register_task(_task)
-
+    task_lookup = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
     modules = import_submodules(path)
     for k, _cls in modules.items():
+        task_name = None
+        members = inspect.getmembers(_cls, task_lookup)
+        # 使用 process 装饰器的类
         if hasattr(_cls, 'process'):
             logger.debug('Loading Task (PRC): %s', k)
             current_app.register_task(_cls.process)
-
-
-def parse_cron(cron):
-    """
-    parse cron format to celery cron
-    http://www.nncron.ru/help/EN/working/cron-format.htm
-    <Minute> <Hour> <Day_of_the_Month> <Month_of_the_Year> <Day_of_the_Week>
-    """
-    if not isinstance(cron, str):
-        return cron
-    if ' ' in cron:
-        minute, hour, day_of_month, month_of_year, day_of_week = cron.split(' ')
-        return crontab(minute=minute, hour=hour, day_of_month=day_of_month, day_of_week=day_of_week,
-                       month_of_year=month_of_year)
-    elif cron.isdigit():  # 数字表示秒数，每隔多少秒执行一次
-        return int(cron)
-
-
-def load_task_schedule(path):
-    if not os.path.exists(path):
-        return
-    schedule = {}
-    with open(path, 'r', encoding='utf-8') as reader:
-        rules = json.load(reader)
-        for r_task in rules:
-            name = r_task.pop('name')
-            cron = parse_cron(r_task.pop('schedule'))
-            # 过滤掉下划线开头的 key，用于备注
-            new_task = {k: v for k, v in r_task.items() if not k.startswith('_')}
-            new_task['schedule'] = cron
-            schedule[name] = new_task  # 保留原始配置(允许配置更多参数)
-    current_app.conf.beat_schedule = schedule
+            task_name = _cls.process.name
+        # 继承 Task 的类
+        if members:
+            _name, _task_cls = members[0]
+            logger.debug('Loading Task (CLS): %s', _name)
+            _task = _task_cls()
+            current_app.register_task(_task)
+            task_name = _task.name
+        # 加载定时器
+        beat_schedule = getattr(_cls, 'SCHEDULE', None)
+        if task_name and beat_schedule:
+            beat_schedule['task'] = task_name
+            current_app.conf.beat_schedule[task_name] = beat_schedule
 
 
 def delete_repeat_task():

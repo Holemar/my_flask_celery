@@ -7,8 +7,14 @@ from celery import current_app
 import settings
 from tasks.fetch import process as fetch_task
 
-
 logger = logging.getLogger(__name__)
+
+
+# 约定每个定时任务文件都需要定义一个 SCHEDULE 变量，用于定义定时任务(不定义这个变量则不认为是定时任务)
+SCHEDULE = {
+    "schedule": 5,  # 每 10 秒执行一次，也可以用 crontab 函数定义定时任务
+    # 'schedule': crontab(minute='*/1'),  # 每分钟执行一次
+}
 
 
 # 定义任务函数，并使用celery.task装饰器进行装饰； task()参数：

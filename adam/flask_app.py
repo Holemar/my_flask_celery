@@ -99,9 +99,7 @@ class Adam(Flask):
         if enable_celery:
             self.celery = celery.Celery(self.name)
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
-
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
-            celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
 
         current_app = self
 
@@ -186,7 +184,7 @@ class Adam(Flask):
         # Load native views
         all_view_modules = list()
         if os.path.exists(path):
-            package_name = path.replace('/', '.')
+            package_name = path.replace('/', '.').replace(os.sep, '.')
             package = importlib.import_module(package_name)
             customize_view_modules = import_submodules(package)
             all_view_modules = list(customize_view_modules.values())
