@@ -17,13 +17,13 @@ SCHEDULE = {
     'schedule': crontab(minute='*/1'),  # 每分钟执行一次
     "args": (),  # 任务函数参数
     "kwargs": {},  # 任务函数关键字参数
-    "options": {},  # 任务选项，比如 定义queue
+    "options": {'queue': settings.NOTIFY_TASK_QUEUE},  # 任务选项，比如 定义queue
 }
 
 
 # 这里是继承 CeleryTask 类的异步任务写法，需要重写 run 方法。
 class NotifyTask(BaseTask, ABC):
-    name = "my_celery_mq.tasks.master_notify"
+    name = f'{settings.APP_NAME}.{__name__}'
 
     def run(self):
         _id = uuid.uuid4()

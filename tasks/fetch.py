@@ -6,7 +6,7 @@ import settings
 logger = logging.getLogger(__name__)
 
 
-@current_app.task(name='my_celery_mq.tasks.fetch', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
+@current_app.task(name=f'{settings.APP_NAME}.{__name__}', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
 def process(self, msg_id, ts):
     """
     执行子任务

@@ -21,7 +21,7 @@ SCHEDULE = {
 # name:可以显示指定任务的名字；
 # serializer：指定序列化的方法；
 # bind:一个bool值，设置是否绑定一个task的实例，如果把绑定，task实例会作为参数传递到任务方法中，可以访问task实例的所有的属性，即前面反序列化中那些属性
-@current_app.task(name='my_celery_mq.tasks.master_fetch', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
+@current_app.task(name=f'{settings.APP_NAME}.{__name__}', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
 def process(self):
     """
     抛出子任务
