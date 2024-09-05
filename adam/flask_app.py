@@ -118,38 +118,7 @@ class Adam(Flask):
         add_file_handler(args.logfile, args.loglevel)
 
         if args.mode in ('route', 'api'):
-            # 加载view
-            self.load_views(self.view_path)
-
-            load_middlewares = [
-                'TokenMiddleware',
-                'CorsMiddleware'
-            ]
-            for oth_midd in self.config.get('MIDDLEWARS', []):
-                if oth_midd not in load_middlewares:
-                    load_middlewares.append(oth_midd)
-            self.available_middlewares = []
-            self.load_middleware(self.middleware_path)
-
-            # 加载自定义中间件
-            for middleware in load_middlewares:
-                if middleware in self.middlewares:
-                    self.available_middlewares.append(self.middlewares[middleware])
-                    logger.debug('Register middleware %s', middleware)
-                else:
-                    logger.error('unregistered middleware %s', middleware)
-
-            self.auth_backends = []
-            for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['adam.auth.token_backend']:
-                auth_module = importlib.import_module(ab)
-                is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
-                clsmembers = inspect.getmembers(auth_module, is_class_member)
-                self.auth_backends.append(clsmembers[0][1]())
-
-            with self.app_context():
-                # 注册特殊页面(首页、静态文件、status、错误处理等)
-                from .views import index, error_handler
-
+            self.load_route()
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
             print(self.url_map)
@@ -176,6 +145,39 @@ class Adam(Flask):
             self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
         else:
             print('Invalid Usage..')
+
+    def load_route(self):
+        # 加载view
+        self.load_views(self.view_path)
+
+        load_middlewares = [
+            'TokenMiddleware',
+            'CorsMiddleware'
+        ]
+        for oth_midd in self.config.get('MIDDLEWARS', []):
+            if oth_midd not in load_middlewares:
+                load_middlewares.append(oth_midd)
+        self.available_middlewares = []
+        self.load_middleware(self.middleware_path)
+
+        # 加载自定义中间件
+        for middleware in load_middlewares:
+            if middleware in self.middlewares:
+                self.available_middlewares.append(self.middlewares[middleware])
+                logger.debug('Register middleware %s', middleware)
+            else:
+                logger.error('unregistered middleware %s', middleware)
+
+        self.auth_backends = []
+        for ab in self.config.get('AUTHENTICATION_BACKENDS') or ['adam.auth.token_backend']:
+            auth_module = importlib.import_module(ab)
+            is_class_member = lambda member: inspect.isclass(member) and member.__module__ == auth_module.__name__
+            clsmembers = inspect.getmembers(auth_module, is_class_member)
+            self.auth_backends.append(clsmembers[0][1]())
+
+        with self.app_context():
+            # 注册特殊页面(首页、静态文件、status、错误处理等)
+            from .views import index, error_handler
 
     def load_views(self, path):
         """
@@ -279,11 +281,11 @@ class Adam(Flask):
                             self.config[key] = value
                     # 是一个类，逐个属性填充
                     elif type(value).__name__ == 'type':
-                        old_value = self.config.get(key)
+                        origin_object = self.config.get(key)
                         for k in dir(value):
                             if k.startswith('__'):
                                 continue
-                            setattr(old_value, k, getattr(value, k))
+                            setattr(origin_object, k, getattr(value, k))
             except ImportError:
                 pass
 

@@ -8,8 +8,9 @@ def get_status():
     uri = 'status'
     response = get(uri, param={
         'url': 1,
-        'models': 0,
-        'config': 0
+        # 'models': 1,
+        # 'config': 1,
+        'beat': 1,
     })
     print(response)
 

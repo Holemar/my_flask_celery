@@ -9,6 +9,40 @@ import importlib
 logger = logging.getLogger(__name__)
 
 
+class VirtualObject(object):
+    """虚拟类，将 dict 转成 Object"""
+    def __init__(self, values: dict = None, default=None):
+        self._values = values
+        self._default = default
+        if values:
+            for k, v in values.items():
+                setattr(self, k, v)
+
+    def __getattr__(self, name):
+        return self._default
+
+    def add_values(self, values: dict):
+        for k, v in values.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
+                self._values[k] = v
+            elif isinstance(v, dict):  # dict 合并，但不递归，也不转换内嵌层级为 Object
+                if k in self._values and isinstance(self._values[k], dict):
+                    self._values[k].update(v)
+            # 是一个类，逐个属性填充
+            elif type(v).__name__ == 'type':
+                origin_object = self._values.get(k)
+                for key in dir(v):
+                    if key.startswith('__'):
+                        continue
+                    if hasattr(origin_object, key):
+                        continue
+                    setattr(origin_object, key, getattr(v, key))
+
+    def to_dict(self):
+        return self._values
+
+
 def import_submodules(package, recursive=True):
     """ Import all submodules of a module, recursively, including subpackages
 

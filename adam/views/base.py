@@ -70,8 +70,8 @@ class ResourceView(object):
 
     embedded_methods = {
         'item_embedded_list_create': {'methods': ['POST']},
-        'item_embedded_list_update': {'methods': ['PUT'], 'params': {'index': 'regex(r"\d+")'}},
-        'item_embedded_list_delete': {'methods': ['DELETE'], 'params': {'index': 'regex(r"\d+")'}}
+        'item_embedded_list_update': {'methods': ['PUT'], 'params': {'index': r'regex(r"\d+")'}},
+        'item_embedded_list_delete': {'methods': ['DELETE'], 'params': {'index': r'regex(r"\d+")'}}
     }
 
     relation_methods = {
