@@ -26,9 +26,9 @@ class CorsMiddleware(Middleware):
     def __call__(self):
         # before resposne
 
-        beg_time = time.time()
+        begin_time = time.time()
         response = self.get_response()
-        time_elapsed = time.time() - beg_time
+        time_elapsed = time.time() - begin_time
 
         if time_elapsed >= API_WARN_TIME:  # 耗时太长
             logger.warning(u'接口耗时太长:%.4f秒 %s URL:%s, 参数: %s 返回:%s',

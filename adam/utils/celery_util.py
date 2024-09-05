@@ -83,7 +83,7 @@ def set_run():
     任务需要长时间运行(超过这里设置的TIME_OUT)，则需要在过期前设置此进程的运行状态，避免任务执行太久导致误认为僵死(会有系统定时任务重启僵死进程)
     """
     global LAST_RUN, TIME_OUT
-    if LAST_RUN is None or (time.time() - LAST_RUN) > (TIME_OUT / 3):
+    if LAST_RUN is None or (time.time() - LAST_RUN) > 60:
         LAST_RUN = time.time()
         # beat 正常运行
         if 'beat' in sys.argv:
