@@ -43,7 +43,8 @@ pip install -r requirements.txt
 - 支持继承 Task 的任务，也支持 celery.task 装饰器的任务
 - 定义 BaseTask 基类，作为所有 celery.task 装饰器的任务的 base，可修改任务执行前后的多个事件
 - 异步任务默认有3次异常重试机制，可在任务中设置重试次数
-- 
+- 继承 BaseTask 基类的异步任务，提供了直接异步调用及同步调用两种静态方式
+
 
 # 代码结构
 |- adam  这目录只放与框架相关的基类、工具类等，不涉及具体业务  

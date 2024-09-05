@@ -39,6 +39,18 @@ class BaseTask(current_app.Task):
     def after_return(self, status, retval, task_id, args, kwargs, einfo):
         logger.debug(f'BaseTask after_return task_id: {task_id}, args: {args}, kwargs: {kwargs}, 任务执行状态 status: {status}, 任务执行结果 retval: {retval}, 异常详细信息 einfo: {einfo}')
 
+    @classmethod
+    def delay(cls, *args, **kwargs):
+        """提供直接异步执行的静态函数"""
+        obj = cls()
+        return obj.apply_async(args=args, kwargs=kwargs)
+
+    @classmethod
+    def sync(cls, *args, **kwargs):
+        """提供直接同步执行的静态函数"""
+        obj = cls()
+        return obj.run(*args, **kwargs)
+
     def __call__(self, *args, **kwargs):
         logger.debug(f'BaseTask task __call__ args: {args}, kwargs:{kwargs}')
         start_time = time.time()
