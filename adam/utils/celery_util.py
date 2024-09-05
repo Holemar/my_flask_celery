@@ -257,10 +257,14 @@ def get_pending_msg():
     queues = config.ALL_QUEUES
     messages = {key: 0 for key in queues}  # 各队列的任务数
     for key in queues:
-        queue_info2 = app.celery.connection().channel().queue_declare(key, passive=True)
-        message_count = queue_info2.message_count
-        total_msg += message_count
-        messages[key] = message_count
+        try:
+            channel = app.celery.connection().channel()
+            queue_info2 = channel.queue_declare(key, passive=False)
+            message_count = queue_info2.message_count
+            total_msg += message_count
+            messages[key] = message_count
+        except Exception as e:
+            logger.exception(f'获取队列{key}信息失败:{e}')
 
     """
     broker_url = app.celery.conf.broker_url
@@ -280,7 +284,7 @@ def get_pending_msg():
     # 使用 RabbitMQ
     elif broker_url.startswith(('amqp://', 'pyamqp://', 'rpc://')):
         pass  # todo: 未实现
-    """
+    # """
 
     return total_msg, messages
 

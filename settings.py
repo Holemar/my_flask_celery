@@ -15,8 +15,8 @@ MONITOR_PASSWORD = os.environ.get('MONITOR_PASSWORD', '')
 
 #  中间件，使用 RabbitMQ，pyamqp://username:Password@HOST:Port//v_host
 # DEFAULT_BROKER = 'amqp://development:password123456@134.175.100.239:5672//development_host'
-# DEFAULT_BROKER = 'redis://:@127.0.0.1:6379/1'  # redis://username:password@host:port/db_number
-DEFAULT_BROKER = "mongodb://localhost:27017/my_mq_jobs"  # mongodb://username:password@host:port/database_name
+DEFAULT_BROKER = 'redis://:@127.0.0.1:6379/1'  # redis://username:password@host:port/db_number
+# DEFAULT_BROKER = "mongodb://localhost:27017/my_mq_jobs"  # mongodb://username:password@host:port/database_name
 # DEFAULT_BROKER = f"sqlalchemy+sqlite:///{BASE_DIR}/db.sqlite"  # sqlite:///path/to/database.db
 
 # 保存运行结果，使用 RabbitMQ, rpc://username:Password@IP:Port//v_host
