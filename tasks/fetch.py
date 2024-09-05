@@ -12,4 +12,5 @@ def process(self, msg_id, ts):
     执行子任务
     """
     logger.info(f"Start fetch task for message: {msg_id}, ts: {ts}")
+    return True
 

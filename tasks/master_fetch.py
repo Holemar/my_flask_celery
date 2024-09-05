@@ -35,10 +35,14 @@ def process(self):
     _t = datetime.now()
     logger.info(f'master_fetch task id: {_id}, ts:{_t}')
 
-    fetch_task.delay([_id], _t)  # 调用 process 函数定义的异步任务
-    # NotifyTask().delay([_id], _t)  # 调用继承 CeleryTask 类异步任务(正常写法)
-    NotifyTask.delay([_id], _t)  # 调用继承 CeleryTask 类异步任务(基类添加的使用方式，静态函数)
-    # NotifyTask.sync([_id], _t)  # 同步调用继承 CeleryTask 类异步任务(基类添加的使用方式，静态函数)，可以直接获取 run 方法的返回值
+    # 异步任务的调用1 (使用 process 函数写法的异步任务)
+    fetch_task.delay([_id], _t)  # 异步调用(不能直接获取结果)
+    fetch_task([_id], _t)  # 同步调用，可以直接获取函数的返回值
+
+    # 异步任务的调用2 (继承 CeleryTask 类写法的异步任务)
+    NotifyTask().delay([_id], _t)  # 异步调用(原生写法)
+    NotifyTask.delay([_id], _t)  # 异步调用(基类添加的使用方式，静态函数)
+    NotifyTask.sync([_id], _t)  # 同步调用(基类添加的使用方式，静态函数)，可以直接获取 run 方法的返回值
 
     # task.delay():这是apply_async方法的别名,但接受的参数较为简单；
     # task.apply_async(args=[arg1, arg2], kwargs={key:value, key:value},

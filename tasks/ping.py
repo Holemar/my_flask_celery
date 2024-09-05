@@ -17,6 +17,7 @@ SCHEDULE = {
 
 
 # 约定每个异步任务，都需要定义一个 process 函数，作为任务的执行函数。也可以继承 CeleryTask 类，重写 run 方法。
+# 注: 自动加载异步任务时，对设置的 name 是要求对应文件名的，所以请勿轻易改变写法。(包括继承 CeleryTask 类的异步任务也有同样要求)
 @current_app.task(name=f'{settings.APP_NAME}.{__name__}', bind=True)
 def process(self):
     """

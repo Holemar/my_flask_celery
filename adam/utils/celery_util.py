@@ -142,20 +142,24 @@ def load_task(path):
         task_name = None
         members = inspect.getmembers(_cls, task_lookup)
         # 使用 process 装饰器的类
-        if hasattr(_cls, 'process'):
-            logger.debug('Loading Task (PRC): %s', k)
-            current_app.register_task(_cls.process)
-            task_name = _cls.process.name
+        if hasattr(_cls, 'process') and isinstance(_cls.process, Task):
+            _task_name = _cls.process.name
+            if _task_name.endswith(k):
+                logger.debug('Loading Task (PRC): %s', k)
+                current_app.register_task(_cls.process)
+                task_name = _task_name
         # 继承 Task 的类
-        elif members:
-            _name, _task_cls = members[0]
-            logger.debug('Loading Task (CLS): %s', _name)
-            _task = _task_cls()
-            current_app.register_task(_task)
-            task_name = _task.name
+        if task_name is None and members:
+            for _name, _task_cls in members:
+                _task_name = _task_cls.name
+                if _task_name.endswith(k):
+                    logger.debug('Loading Task (CLS): %s', _name)
+                    _task = _task_cls()
+                    current_app.register_task(_task)
+                    task_name = _task_name
         # 加载定时器
         beat_schedule = getattr(_cls, 'SCHEDULE', None)
-        if task_name and beat_schedule:
+        if task_name and task_name.endswith(k) and beat_schedule:
             beat_schedule['task'] = task_name
             BEAT_SCHEDULE[task_name] = beat_schedule
     current_app.conf.beat_schedule = BEAT_SCHEDULE
