@@ -6,13 +6,12 @@ from __init__ import get, post, set_host  # 导入环境
 
 def get_status():
     uri = 'status'
-    response = get(uri, param={
-        'url': 1,
+    get(uri, param={
+        # 'url': 1,
         # 'models': 1,
         # 'config': 1,
         'beat': 1,
-    })
-    print(response)
+    }, return_json=True)
 
 
 if __name__ == '__main__':

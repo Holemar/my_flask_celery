@@ -5,6 +5,7 @@
 
 import logging
 import unittest
+from tests import SOURCE_PATH
 
 
 def setUp(self):

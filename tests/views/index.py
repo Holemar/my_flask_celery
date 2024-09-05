@@ -2,7 +2,6 @@
 
 import json
 import unittest
-import __init__  # 导入环境
 
 
 class TestIndexView(unittest.TestCase):
@@ -18,9 +17,14 @@ class TestIndexView(unittest.TestCase):
 
         # 按照json解析
         resp_dict = json.loads(resp_json)
+        print(resp_dict)
 
-        # 使用断言进行验证：是否存在code字符串在字典中
+        # 使用断言进行验证
         self.assertIn("beat", resp_dict)
+        self.assertIn("workers", resp_dict)
+        self.assertIn("pend_message", resp_dict)
+        self.assertIn("version", resp_dict)
+        self.assertTrue(0 < resp_dict.get("duration") < 1)  # 响应时间在0s~1s之间
 
 
 if __name__ == '__main__':
