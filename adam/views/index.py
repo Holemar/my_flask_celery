@@ -3,6 +3,7 @@ import os
 import time
 import logging
 from flask import jsonify, request, current_app
+from .blueprint import return_data
 from ..utils.config_util import config
 from ..utils.json_util import json_serializable
 from ..utils.celery_util import get_pending_msg, get_beat, get_workers, get_beat_schedule
@@ -66,3 +67,20 @@ def status():
 def serve_static(filename):
     """静态文件访问"""
     return current_app.send_static_file(filename)
+
+
+@current_app.errorhandler(404)
+def page_not_found(e):
+    """404出错，区分前后端"""
+    url = request.full_path
+    prefix = config.URL_PREFIX
+    if not prefix or url.startswith(f'/{prefix}/'):
+        return return_data(code=404, message=str(e))
+    else:
+        return current_app.send_static_file('index.html')
+
+
+@current_app.errorhandler(500)
+def internal_server_error(e):
+    """程序执行错误"""
+    return return_data(code=500, message=str(e))

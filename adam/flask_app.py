@@ -177,7 +177,7 @@ class Adam(Flask):
 
         with self.app_context():
             # 注册特殊页面(首页、静态文件、status、错误处理等)
-            from .views import index, error_handler
+            from .views import index
 
     def load_views(self, path):
         """

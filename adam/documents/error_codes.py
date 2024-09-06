@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 class BaseError(object, metaclass=CodeType):
 
+    crawl_error = (399, '爬虫获取网页信息异常！')
+
     unknown_error = (400, '未知错误！')
     unauthorized = (401, '未授权')
     forbidden = (402, '无权限')
