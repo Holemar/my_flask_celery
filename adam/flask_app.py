@@ -132,6 +132,15 @@ class Adam(Flask):
                 port = int(args.port)
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
             super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
+        elif args.mode == 'gevent':
+            from gevent import monkey
+            monkey.patch_all()
+            host = os.environ.get('HOST') or '0.0.0.0'
+            port = int(os.environ.get('PORT') or '8000')
+            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
+                port = int(args.port)
+            single_thread = True if os.environ.get('SINGLE_THREAD') else False
+            super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
         elif args.mode == 'worker':
             celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
             if args.concurrency:

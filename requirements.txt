@@ -43,4 +43,10 @@ idna==3.7
 requests==2.32.3
 urllib3==2.2.2
 
+# gevent 安装的依赖
+pycparser==2.22
+cffi==1.17.1
+zope.interface==7.0.3
+zope.event==5.0
+gevent==24.2.1
 
