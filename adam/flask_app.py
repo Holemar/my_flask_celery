@@ -105,7 +105,7 @@ class Adam(Flask):
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor'])
+        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor', 'gevent', 'uwsgi'])
         parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
@@ -117,8 +117,13 @@ class Adam(Flask):
         args, unknown_args = parser.parse_known_args()
         add_file_handler(args.logfile, args.loglevel)
 
-        if args.mode in ('route', 'api'):
+        if args.mode in ('route', 'api', 'gevent', 'uwsgi'):
             self.load_route()
+            self.host = os.environ.get('HOST') or '0.0.0.0'
+            self.port = int(os.environ.get('PORT') or '8000')
+            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
+                self.port = int(args.port)
+            self.debug = debug
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
             print(self.url_map)
@@ -126,21 +131,20 @@ class Adam(Flask):
             print('models:', self.models)
             print('middlewares:', self.middlewares)
         elif args.mode == 'api':
-            host = os.environ.get('HOST') or '0.0.0.0'
-            port = int(os.environ.get('PORT') or '8000')
-            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
-                port = int(args.port)
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
-            super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
+            super().run(host=self.host, threaded=(not single_thread), port=self.port, debug=debug, **options)
         elif args.mode == 'gevent':
-            from gevent import monkey
+            from gevent import monkey, pywsgi
             monkey.patch_all()
-            host = os.environ.get('HOST') or '0.0.0.0'
-            port = int(os.environ.get('PORT') or '8000')
-            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
-                port = int(args.port)
-            single_thread = True if os.environ.get('SINGLE_THREAD') else False
-            super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
+            from werkzeug.debug import DebuggedApplication
+            dapp = DebuggedApplication(self, evalex=True)
+            server = pywsgi.WSGIServer((self.host, self.port), dapp)
+            server.serve_forever()
+        elif args.mode == 'uwsgi':
+            from gevent import monkey, pywsgi
+            monkey.patch_all()
+            # uwsgi --socket 0.0.0.0:5000 -w main:app  # -w 指定wsgi模块，main:app 是指wsgi模块的app变量名
+            # uwsgi --http 0.0.0.0:8000 --master --gevent -p 4 -w main:app  # -master 选项指定标准的worker管理器，-p 4 指定worker进程数
         elif args.mode == 'worker':
             celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
             if args.concurrency:
