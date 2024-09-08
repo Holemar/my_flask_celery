@@ -22,6 +22,12 @@ def front_page(filename):
     return current_app.send_static_file('index.html')
 
 
+@current_app.route('/test')
+def test():
+    time.sleep(0.1)
+    return {"code": 0, "message": "success"}
+
+
 @current_app.route('/status')
 def status():
     """用于查看程序运行状态。任务堆积情况等"""

@@ -105,7 +105,7 @@ class Adam(Flask):
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor', 'gevent', 'uwsgi'])
+        parser.add_argument('-m', '--mode', choices=['route', 'api', 'gevent', 'web', 'worker', 'beat', 'monitor', 'shell'])
         parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
@@ -117,7 +117,7 @@ class Adam(Flask):
         args, unknown_args = parser.parse_known_args()
         add_file_handler(args.logfile, args.loglevel)
 
-        if args.mode in ('route', 'api', 'gevent', 'uwsgi'):
+        if args.mode in ('route', 'api', 'gevent', 'web'):
             self.load_route()
             self.host = os.environ.get('HOST') or '0.0.0.0'
             self.port = int(os.environ.get('PORT') or '8000')
@@ -133,14 +133,14 @@ class Adam(Flask):
         elif args.mode == 'api':
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
             super().run(host=self.host, threaded=(not single_thread), port=self.port, debug=debug, **options)
-        elif args.mode == 'gevent':
+        elif args.mode == 'gevent':  # 启动gevent服务器，效果跟 flask api 一样
             from gevent import monkey, pywsgi
             monkey.patch_all()
             from werkzeug.debug import DebuggedApplication
             dapp = DebuggedApplication(self, evalex=True)
             server = pywsgi.WSGIServer((self.host, self.port), dapp)
             server.serve_forever()
-        elif args.mode == 'uwsgi':
+        elif args.mode == 'web':
             from gevent import monkey, pywsgi
             monkey.patch_all()
             # uwsgi --socket 0.0.0.0:5000 -w main:app  # -w 指定wsgi模块，main:app 是指wsgi模块的app变量名
@@ -156,6 +156,11 @@ class Adam(Flask):
             self.celery.start(argv=celery_argv + ['beat', '-l', args.loglevel] + unknown_args)
         elif args.mode == 'monitor':
             self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
+        elif args.mode == 'shell':
+            from IPython import embed
+            from .utils.serializer import mongo_to_dict
+            with self.app_context():
+                embed(header='Shell')
         else:
             print('Invalid Usage..')
 

@@ -56,3 +56,18 @@ zope.interface==7.0.3
 zope.event==5.0
 gevent==24.2.1
 
+# ipython 安装
+asttokens==2.4.1
+pure-eval==0.2.3
+executing==2.1.0
+ptyprocess==0.7.0
+parso==0.8.4
+stack-data==0.6.3
+jedi==0.19.1
+pexpect==4.9.0
+traitlets==5.14.3
+decorator==5.1.1
+pygments==2.18.0
+matplotlib-inline==0.1.7
+ipython==8.27.0
+

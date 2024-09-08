@@ -36,10 +36,29 @@ def test_single(*args, **kwargs):
     logging.info(u'test_single 耗时:%.4f 秒, 出错次数:%s', run_time, error_time)
 
 
+# 持续地发请求(单线程)
+def test_single2(*args, **kwargs):
+    """
+    单次请求
+    """
+    global error_time
+    start_time = time.time()
+    try:
+        resp_dict = get('test', param={}, return_json=True)
+        assert resp_dict == {"code": 0, "message": "success"}
+    except Exception as e:
+        logging.error(u'请求出错:%s' % e)
+        error_time += 1
+    # 记录总运行时间
+    run_time = time.time() - start_time
+    logging.info(u'test_single 耗时:%.4f 秒, 出错次数:%s', run_time, error_time)
+
+
 def all_test():
     """
     并发请求测试
     """
+    logging.info('请求 线程数: %s, 重复次数: %s', THREAD_LINE, repeat_number)
     start_time = time.time()
     pool = ThreadPool(THREAD_LINE)
 
