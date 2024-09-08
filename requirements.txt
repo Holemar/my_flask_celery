@@ -43,4 +43,9 @@ idna==3.7
 requests==2.32.3
 urllib3==2.2.2
 
+# flower 安装的依赖
+pytz==2024.1
+humanize==4.10.0
+tornado==6.4.1
+flower==2.0.1
 
