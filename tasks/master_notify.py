@@ -2,67 +2,47 @@
 import time
 import uuid
 import logging
-from abc import ABC
 
-from celery import current_app, Task
+from celery import current_app
+from celery.schedules import crontab
+
 import settings
-
+from adam.celery_base_task import BaseTask
 
 logger = logging.getLogger(__name__)
 
+# 约定每个定时任务文件都需要定义一个 SCHEDULE 变量，用于定义定时任务(不定义这个变量则不认为是定时任务)
+SCHEDULE = {
+    # "schedule": 10,  # 每 10 秒执行一次
+    'schedule': crontab(minute='*/1'),  # 每分钟执行一次
+    "args": (),  # 任务函数参数
+    "kwargs": {},  # 任务函数关键字参数
+    # "options": {'queue': settings.NOTIFY_TASK_QUEUE},  # 任务选项，比如 定义queue
+}
 
-class NotifyTask(Task, ABC):
-    name = "my_celery_mq.tasks.master_notify"
-    max_retries = 3
-    default_retry_delay = 1
 
-    # 任务开始前执行
-    def before_start(self, task_id, args, kwargs):
-        logger.info(f'NotifyTask before_start task_id: {task_id}, args: {args}, kwargs: {kwargs}')
+# 这里是继承 CeleryTask 类的异步任务写法，需要重写 run 方法。
+class NotifyTask(BaseTask):
+    name = f'{settings.APP_NAME}.{__name__}'  # 注: 自动加载异步任务时，对设置的 name 是要求对应文件名的，所以请勿轻易改变写法。
+    queue = settings.NOTIFY_TASK_QUEUE
 
-    # 任务失败时执行
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        logger.error(f'NotifyTask on_failure task_id: {task_id}, args: {args}, kwargs: {kwargs}, 错误的类型 exc: {exc}, 异常详细信息 einfo: {einfo}')
-
-    # 任务成功时执行
-    def on_success(self, retval, task_id, args, kwargs):
-        logger.info(f'NotifyTask on_success task_id: {task_id}, args: {args}, kwargs: {kwargs}, 任务执行结果 retval: {retval}')
-
-    # 任务重试时执行
-    def on_retry(self, exc, task_id, args, kwargs, einfo):
-        logger.error(f'NotifyTask on_retry task_id: {task_id}, args: {args}, kwargs: {kwargs}, 错误的类型 exc: {exc}, 异常详细信息 einfo: {einfo}')
-
-    # 当任务执行完毕
-    def after_return(self, status, retval, task_id, args, kwargs, einfo):
-        logger.info(f'NotifyTask after_return task_id: {task_id}, args: {args}, kwargs: {kwargs}, 任务执行状态 status: {status}, 任务执行结果 retval: {retval}, 异常详细信息 einfo: {einfo}')
-
-    def __call__(self, *args, **kwargs):
-        logger.info(f'NotifyTask task __call__ args: {args}, kwargs:{kwargs}')
-        return super().__call__(*args, **kwargs)
-
-    def run(self):
-        _id = uuid.uuid4()
-        _t = int(time.time())
+    def run(self, _id=None, _t=None):
+        _id = _id or uuid.uuid4()
+        _t = _t or int(time.time())
         retries = int(self.request.retries)  # 重试次数
         logger.info(f'NotifyTask task run id: {_id}, ts:{_t}, 重试次数: {retries}')
-        # 观察异常情况、重试情况
-        if retries <= 2:
-            raise self.retry(exc=RuntimeError('看看异常怎么处理'), countdown=self.default_retry_delay, max_retries=self.max_retries)
-        else:
-            return True
+        return True
+        # if retries <= 2: a = 1 / 0  # 观察异常情况、重试情况
 
-
-''' NotifyTask.run 函数可以代替下面写法
-@current_app.task(base=NotifyTask, name='my_celery_mq.tasks.master_notify', queue=settings.NOTIFY_TASK_QUEUE, bind=True)  # , priority=0)
+'''
+# NotifyTask.run 函数可以代替下面写法
+@current_app.task(name=f'{settings.APP_NAME}.{__name__}', queue=settings.NOTIFY_TASK_QUEUE, bind=True)  # , priority=0)
 def process(self):
     _id = uuid.uuid4()
     _t = int(time.time())
     retries = int(self.request.retries)  # 重试次数
     logger.info(f'master_notify task id: {_id}, ts:{_t}, 重试次数: {retries}')
-    # 观察异常情况、重试情况
-    if retries <= 2:
-        raise self.retry(exc=RuntimeError('看看异常怎么处理'), countdown=self.default_retry_delay, max_retries=self.max_retries)
-    else:
-        return True
+    return True
+    # if retries <= 2: a = 1 / 0  # 观察异常情况、重试情况
 # '''
 

@@ -24,8 +24,8 @@ def get_redis_client(redis_url):
     import redis
     pool = redis.ConnectionPool.from_url(
         redis_url,
-        decode_components=True,
-        decode_responses=True,
+        # decode_components=True,
+        # decode_responses=True,
     )
     redis_client = redis.Redis(connection_pool=pool)
     return redis_client

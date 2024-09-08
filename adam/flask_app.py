@@ -51,11 +51,10 @@ class Adam(Flask):
         global current_app
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
-        cur_dir = os.path.dirname(__file__)
         logger.info('Init Adam')
-        self.current_file_dir = os.path.abspath(cur_dir)
-        self.root = root or os.getcwd()  # 当前目录
-
+        cur_dir = os.path.dirname(__file__)
+        self.current_file_dir = os.path.abspath(cur_dir)  # 当前文件所在目录
+        self.root = root or os.getcwd()  # 项目启动目录
 
         if root:
             # 引入项目根目录以及lib跟目录
@@ -71,6 +70,8 @@ class Adam(Flask):
         super().__init__(import_name, **kwargs)
 
         self.settings = settings
+        self.view_path = view_path
+        self.middleware_path = middleware_path
         self.load_config()
 
         # name
@@ -94,8 +95,73 @@ class Adam(Flask):
         # 加载model
         self.load_models(model_path)
 
+        # 加载celery(api端启动时也需要加载，让接口能抛出异步任务)
+        if enable_celery:
+            self.celery = celery.Celery(self.name)
+            self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
+            celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
+
+        current_app = self
+
+    def run(self, debug=None, **options):
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor', 'gevent', 'uwsgi'])
+        parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
+        parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
+        parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
+        parser.add_argument('-Q', '--queues', default=','.join(self.config.get('ALL_QUEUES')))
+        parser.add_argument('--prefetch-multiplier', default='')
+        parser.add_argument('-f', '--logfile', default='')
+        parser.add_argument('-p', '--port', default='')
+        parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
+        args, unknown_args = parser.parse_known_args()
+        add_file_handler(args.logfile, args.loglevel)
+
+        if args.mode in ('route', 'api', 'gevent', 'uwsgi'):
+            self.load_route()
+            self.host = os.environ.get('HOST') or '0.0.0.0'
+            self.port = int(os.environ.get('PORT') or '8000')
+            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
+                self.port = int(args.port)
+            self.debug = debug
+        celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
+        if args.mode == 'route':
+            print(self.url_map)
+            print('views:', self.views)
+            print('models:', self.models)
+            print('middlewares:', self.middlewares)
+        elif args.mode == 'api':
+            single_thread = True if os.environ.get('SINGLE_THREAD') else False
+            super().run(host=self.host, threaded=(not single_thread), port=self.port, debug=debug, **options)
+        elif args.mode == 'gevent':
+            from gevent import monkey, pywsgi
+            monkey.patch_all()
+            from werkzeug.debug import DebuggedApplication
+            dapp = DebuggedApplication(self, evalex=True)
+            server = pywsgi.WSGIServer((self.host, self.port), dapp)
+            server.serve_forever()
+        elif args.mode == 'uwsgi':
+            from gevent import monkey, pywsgi
+            monkey.patch_all()
+            # uwsgi --socket 0.0.0.0:5000 -w main:app  # -w 指定wsgi模块，main:app 是指wsgi模块的app变量名
+            # uwsgi --http 0.0.0.0:8000 --master --gevent -p 4 -w main:app  # -master 选项指定标准的worker管理器，-p 4 指定worker进程数
+        elif args.mode == 'worker':
+            celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
+            if args.concurrency:
+                celery_argv += ['-c', args.concurrency]
+            if args.prefetch_multiplier:
+                celery_argv += ['--prefetch-multiplier', args.prefetch_multiplier]
+            self.celery.start(argv=celery_argv + unknown_args)
+        elif args.mode == 'beat':
+            self.celery.start(argv=celery_argv + ['beat', '-l', args.loglevel] + unknown_args)
+        elif args.mode == 'monitor':
+            self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
+        else:
+            print('Invalid Usage..')
+
+    def load_route(self):
         # 加载view
-        self.load_views(view_path)
+        self.load_views(self.view_path)
 
         load_middlewares = [
             'TokenMiddleware',
@@ -105,7 +171,7 @@ class Adam(Flask):
             if oth_midd not in load_middlewares:
                 load_middlewares.append(oth_midd)
         self.available_middlewares = []
-        self.load_middleware(middleware_path)
+        self.load_middleware(self.middleware_path)
 
         # 加载自定义中间件
         for middleware in load_middlewares:
@@ -122,54 +188,9 @@ class Adam(Flask):
             clsmembers = inspect.getmembers(auth_module, is_class_member)
             self.auth_backends.append(clsmembers[0][1]())
 
-        if enable_celery:
-            self.celery = celery.Celery(self.name)
-            self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
-
-            celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
-            celery_util.load_task_schedule(os.path.join(self.root, task_path, 'schedule.json'))  # 加载定时任务
-        current_app = self
-
-    def run(self, debug=None, **options):
-        parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['route', 'api', 'worker', 'beat', 'monitor'])
-        parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
-        parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
-        parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
-        parser.add_argument('-Q', '--queues', default=','.join(self.config.get('ALL_QUEUES')))
-        parser.add_argument('--prefetch-multiplier', default='')
-        parser.add_argument('-f', '--logfile', default='')
-        parser.add_argument('-p', '--port', default='')
-        parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
-        args, unknown_args = parser.parse_known_args()
-        add_file_handler(args.logfile, args.loglevel)
-
-        celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
-        if args.mode == 'route':
-            print(self.url_map)
-            print('views:', self.views)
-            print('models:', self.models)
-            print('middlewares:', self.middlewares)
-        elif args.mode == 'api':
-            host = os.environ.get('HOST') or '0.0.0.0'
-            port = int(os.environ.get('PORT') or '8000')
-            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
-                port = int(args.port)
-            single_thread = True if os.environ.get('SINGLE_THREAD') else False
-            super().run(host=host, threaded=(not single_thread), port=port, debug=debug, **options)
-        elif args.mode == 'worker':
-            celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
-            if args.concurrency:
-                celery_argv += ['-c', args.concurrency]
-            if args.prefetch_multiplier:
-                celery_argv += ['--prefetch-multiplier', args.prefetch_multiplier]
-            self.celery.start(argv=celery_argv + unknown_args)
-        elif args.mode == 'beat':
-            self.celery.start(argv=celery_argv + ['beat', '-l', args.loglevel] + unknown_args)
-        elif args.mode == 'monitor':
-            self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
-        else:
-            print('Invalid Usage..')
+        with self.app_context():
+            # 注册特殊页面(首页、静态文件、status、错误处理等)
+            from .views import index
 
     def load_views(self, path):
         """
@@ -178,7 +199,7 @@ class Adam(Flask):
         # Load native views
         all_view_modules = list()
         if os.path.exists(path):
-            package_name = path.replace('/', '.')
+            package_name = path.replace('/', '.').replace(os.sep, '.')
             package = importlib.import_module(package_name)
             customize_view_modules = import_submodules(package)
             all_view_modules = list(customize_view_modules.values())
@@ -200,8 +221,10 @@ class Adam(Flask):
             acl = cls_view.acl
             routes = {}
             bp = inspect.getmembers(module, lookup_bp)
+            bp_obj = bp[0][1] if bp else None
             if bp:
-                routes = bp[0][1].routes
+                routes.update(bp_obj.routes)
+                acl.extend(bp_obj.acl)
 
             # check alias
             cls_parent = cls_view.__bases__[0]
@@ -212,9 +235,9 @@ class Adam(Flask):
                 bp = inspect.getmembers(sys.modules[cls_parent.__module__], lookup_bp)
                 if bp:
                     routes = {
-                        'item': {**routes['item'], **bp[0][1].routes['item']},
-                        'collection': {**routes['collection'], **bp[0][1].routes['collection']},
-                        'remote_item': {**routes['remote_item'], **bp[0][1].routes['remote_item']}
+                        'item': {**routes['item'], **bp_obj.routes['item']},
+                        'collection': {**routes['collection'], **bp_obj.routes['collection']},
+                        'remote_item': {**routes['remote_item'], **bp_obj.routes['remote_item']}
                     }
 
             model = self.models.get(resource)
@@ -231,7 +254,8 @@ class Adam(Flask):
         load all model logic
         """
         lookup_model = lambda x: inspect.isclass(x) and x != ResourceDocument and issubclass(x, ResourceDocument)
-        self.models = load_modules(path, lookup_model)
+        self.models = load_modules('adam.models', lookup_model)
+        self.models.update(load_modules(path, lookup_model))
 
     def load_middleware(self, path):
         """
@@ -270,11 +294,11 @@ class Adam(Flask):
                             self.config[key] = value
                     # 是一个类，逐个属性填充
                     elif type(value).__name__ == 'type':
-                        old_value = self.config.get(key)
+                        origin_object = self.config.get(key)
                         for k in dir(value):
                             if k.startswith('__'):
                                 continue
-                            setattr(old_value, k, getattr(value, k))
+                            setattr(origin_object, k, getattr(value, k))
             except ImportError:
                 pass
 

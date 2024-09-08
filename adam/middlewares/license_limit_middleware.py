@@ -4,11 +4,11 @@
 License middleware
 """
 
-import json
-from flask import request, abort, Response
+from flask import request
 from datetime import datetime
 from flask import current_app as app
 from .base import Middleware
+from ..documents import BaseError
 
 
 class LicenseLimitMiddleware(Middleware):
@@ -28,21 +28,9 @@ class LicenseLimitMiddleware(Middleware):
                 license = request.license
                 if license:
                     if license.expired_at and datetime.now() > license.expired_at:
-                        # abort(400, 'License limit exceeded (expired)')
-                        error = {
-                            'code': 400,
-                            'message': 'License limit exceeded (expired)',
-                            'detail': 'License limit exceeded (expired)',
-                        }
-                        return Response(json.dumps(error), status=400, mimetype='application/json')
+                        BaseError.license_expired()
                     elif license.limit and license.limit > 0 and license.count and license.count >= license.limit:
-                        # abort(400, 'License limit exceeded')
-                        error = {
-                            'code': 400,
-                            'message': 'License limit exceeded',
-                            'detail': 'License limit exceeded',
-                        }
-                        return Response(json.dumps(error), status=400, mimetype='application/json')
+                        BaseError.over_limit()
 
         response = self.get_response()
 

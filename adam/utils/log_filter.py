@@ -176,7 +176,7 @@ class DbHandler(logging.Handler):
 
     def emit(self, record):
         """日志输出"""
-        from models.log import Log
+        from ..models.log import Log
         # 存储不被截取的log消息
         msg = getattr(record, 'old_msg', record.getMessage())
         Log.add(record, msg)
@@ -231,6 +231,9 @@ def global_logger_setup_handler(*args, **kwargs):
     """
     添加 celery 的 logger，它会清除之前的所有 log Handler，需要这里重新添加一次
     """
+    # 排除屏幕输出(StandardErrorHandler)
+    logger.handlers[:] = [h for h in logger.handlers if not isinstance(h, logging.StreamHandler)]
+
     if file_handler:
         logger.addHandler(file_handler)
     else:

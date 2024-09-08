@@ -112,7 +112,8 @@ class ResourceDocument(Document, IDocument):
         """
         model 事件 before_save
         """
-        pass
+        if self.id:
+            self._fields_changed = self.real_changed_fields()
 
     def after_create(self, instance):
         """
@@ -237,3 +238,23 @@ class ResourceDocument(Document, IDocument):
 
     def from_dict(self):
         return mongo_to_dict(self)
+
+    def real_changed_fields(self):
+        changes = []
+        if hasattr(self, '_changed_fields'):
+            for field in self._changed_fields:
+                if '.' not in field:
+                    real_field = self._reverse_db_field_map[field]
+                    changes.append(real_field)
+                else:
+                    # for dict type, changed_filed 可能包含路径
+                    # stats = DictField()
+                    # obj.stats['count'] = 10
+                    # 如上代码可能会触发 stats.count 改动。所以一律只取父亲的节点
+                    parent_field = field.split('.')[0]
+                    real_field = self._reverse_db_field_map[parent_field]
+                    changes.append(parent_field)
+        # 在 save 之后，没有 _changed_fields 内容，这里自己缓存了
+        if not changes and hasattr(self, '_fields_changed'):
+            return self._fields_changed
+        return changes

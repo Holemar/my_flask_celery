@@ -49,3 +49,10 @@ humanize==4.10.0
 tornado==6.4.1
 flower==2.0.1
 
+# gevent 安装的依赖
+pycparser==2.22
+cffi==1.17.1
+zope.interface==7.0.3
+zope.event==5.0
+gevent==24.2.1
+

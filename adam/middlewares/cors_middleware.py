@@ -11,22 +11,12 @@ import logging
 from flask import request
 
 from ..utils.config_util import config
+from ..utils.url_util import get_param
 from .base import Middleware
 
 # api 超时警告时间，单位：秒
 API_WARN_TIME = float(os.environ.get('API_TIMEOUT') or 1)
 logger = logging.getLogger(__name__)
-
-
-def get_param():
-    """获取参数"""
-    try:
-        post_data = request.data
-        if post_data and isinstance(post_data, (bytes, bytearray)):
-            post_data = post_data.decode()
-        return post_data
-    except:
-        return None
 
 
 class CorsMiddleware(Middleware):
@@ -36,9 +26,9 @@ class CorsMiddleware(Middleware):
     def __call__(self):
         # before resposne
 
-        beg_time = time.time()
+        begin_time = time.time()
         response = self.get_response()
-        time_elapsed = time.time() - beg_time
+        time_elapsed = time.time() - begin_time
 
         if time_elapsed >= API_WARN_TIME:  # 耗时太长
             logger.warning(u'接口耗时太长:%.4f秒 %s URL:%s, 参数: %s 返回:%s',

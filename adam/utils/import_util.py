@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import os
 import re
 import logging
 import inspect
@@ -6,6 +7,40 @@ import pkgutil
 import importlib
 
 logger = logging.getLogger(__name__)
+
+
+class VirtualObject(object):
+    """虚拟类，将 dict 转成 Object"""
+    def __init__(self, values: dict = None, default=None):
+        self._values = values
+        self._default = default
+        if values:
+            for k, v in values.items():
+                setattr(self, k, v)
+
+    def __getattr__(self, name):
+        return self._default
+
+    def add_values(self, values: dict):
+        for k, v in values.items():
+            if not hasattr(self, k):
+                setattr(self, k, v)
+                self._values[k] = v
+            elif isinstance(v, dict):  # dict 合并，但不递归，也不转换内嵌层级为 Object
+                if k in self._values and isinstance(self._values[k], dict):
+                    self._values[k].update(v)
+            # 是一个类，逐个属性填充
+            elif type(v).__name__ == 'type':
+                origin_object = self._values.get(k)
+                for key in dir(v):
+                    if key.startswith('__'):
+                        continue
+                    if hasattr(origin_object, key):
+                        continue
+                    setattr(origin_object, key, getattr(v, key))
+
+    def to_dict(self):
+        return self._values
 
 
 def import_submodules(package, recursive=True):
@@ -16,6 +51,7 @@ def import_submodules(package, recursive=True):
     :rtype: dict[str, types.ModuleType]
     """
     if isinstance(package, str):
+        package = package.replace('/', '.').replace(os.sep, '.')
         package = importlib.import_module(package)
     results = {}
     for _, name, is_pkg in pkgutil.walk_packages(package.__path__):
@@ -25,17 +61,16 @@ def import_submodules(package, recursive=True):
         try:
             results[full_name] = importlib.import_module(full_name)
         except Exception as e:
-            logger.warning('Failed to import %s: %s', full_name, e)
+            logger.exception('Failed to import %s: %s', full_name, e)
         if recursive and is_pkg:
             results.update(import_submodules(full_name))
     return results
 
 
-def discovery_items_in_package(package, func_lookup=None):
+def discovery_items_in_package(package, func_lookup=inspect.isfunction):
     """
         discovery all function at most depth(2) in specified package
     """
-    func_lookup = func_lookup or inspect.isfunction
     functions = []
     _modules = import_submodules(package)
     for _k, _m in _modules.items():
@@ -50,7 +85,7 @@ def load_modules(path, func_lookup=None):
     """
     models = {}
 
-    path = path.replace('/', '.')
+    path = path.replace('/', '.').replace(os.sep, '.')
     package = importlib.import_module(path)
     all_modules = discovery_items_in_package(package, func_lookup)
 

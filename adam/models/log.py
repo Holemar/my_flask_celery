@@ -13,9 +13,9 @@ from flask import request
 from mongoengine import Document
 from mongoengine.fields import IntField, StringField, DictField
 
-from adam.documents import ResourceDocument
-from adam.utils.str_util import decode2str
-from adam.utils.json_util import json_serializable
+from ..documents import ResourceDocument
+from ..utils.str_util import decode2str
+from ..utils.json_util import json_serializable
 
 # 记录各变量时，排除的类型
 NotRecordTypes = (types.FunctionType, types.LambdaType, types.ModuleType, type(Document), type)
@@ -161,10 +161,10 @@ class Log(ResourceDocument):
             obj.thread_name = record.threadName
             obj.process_name = record.processName
             obj.message = msg or record.getMessage()
-            for m in ("403: Forbidden", '账户或密码错误', '邮箱服务器配置不正确', '需要pop3配置信息', '需要imap配置信息'):
-                if m in obj.message:
-                    return
             obj.exc_info = str(record.exc_info) if record.exc_info else None
+            # 过滤业务异常日志
+            if obj.exc_info and obj.exc_info.startswith("(<class 'adam.documents.exceptions.BussinessCommonException'>, "):
+                return
             obj.exc_text = str(record.exc_text) if record.exc_text else None
             if record.levelno >= 40:
                 obj.f_locals = get_locals(record.pathname)

@@ -5,10 +5,6 @@ Blueprint, different to Flask one
 import os
 import logging
 
-from mongoengine import Document
-from werkzeug.exceptions import HTTPException
-from flask import request
-
 logger = logging.getLogger(__name__)
 SUCCESS_CODE = int(os.environ.get('SUCCESS_CODE', 200))  # 成功的返回码
 SUCCESS_MESSAGE = os.environ.get('SUCCESS_MESSAGE', 'success')  # 成功的返回值
@@ -31,8 +27,9 @@ class Blueprint(object):
     def __init__(self, name):
         self.name = name
         self.routes = {'item': {}, 'collection': {}, 'remote_item': {}}
+        self.acl = []
 
-    def decorator(self, routes_key, action, methods, params=None):
+    def decorator(self, routes_key, action, methods, params=None, permissions=None):
         def wrapper(fun):
             self.routes[routes_key][action] = {
                 'action': action,
@@ -41,59 +38,25 @@ class Blueprint(object):
                 'params': params or {},
                 'function_name': fun.__name__
             }
-            return run_api(fun)
+            if permissions:
+                self.acl.append(f'{routes_key}@{action}')
+            return fun
         return wrapper
 
-    def item_method(self, action, methods, params=None):
+    def item_method(self, action, methods, params=None, permissions=None):
         """Like :meth:`Flask.route` but for a blueprint.  The endpoint for the
         :func:`url_for` function is prefixed with the name of the blueprint.
         """
-        return self.decorator('item', action, methods, params)
+        return self.decorator('item', action, methods, params, permissions)
 
-    def remote_item_method(self, action, methods, params=None):
+    def remote_item_method(self, action, methods, params=None, permissions=None):
         """Like :meth:`Flask.route` but for a blueprint.  The endpoint for the
         :func:`url_for` function is prefixed with the name of the blueprint.
         """
-        return self.decorator('remote_item', action, methods, params)
+        return self.decorator('remote_item', action, methods, params, permissions)
 
-    def static_method(self, action, methods, params=None):
+    def static_method(self, action, methods, params=None, permissions=None):
         """Like :meth:`Flask.route` but for a blueprint.  The endpoint for the
         :func:`url_for` function is prefixed with the name of the blueprint.
         """
-        return self.decorator('collection', action, methods, params)
-
-
-def get_param():
-    """获取参数"""
-    try:
-        post_data = request.data
-        if post_data and isinstance(post_data, (bytes, bytearray)):
-            post_data = post_data.decode()
-        return post_data
-    except:
-        return None
-
-
-def run_api(fun):
-    """接口执行异常捕获"""
-
-    def wrapper(*args, **kwargs):
-        try:
-            res = fun(*args, **kwargs)
-            # 强行封装成统一格式
-            if isinstance(res, (list, dict)) and 'code' not in res:
-                res = return_data(data=res)
-            elif isinstance(res, Document):
-                res = return_data(data=res)
-            return res
-        except HTTPException as e:
-            logger.exception("请求异常 %s %s: %s: %s，参数:%s",
-                             request.method, request.full_path, e, e.description, get_param())
-            if e.response:
-                return e.get_response()
-            else:
-                raise
-        except Exception as e:
-            logger.exception("请求异常 %s %s: %s，参数:%s", request.method, request.full_path, e, get_param())
-            raise
-    return wrapper
+        return self.decorator('collection', action, methods, params, permissions)

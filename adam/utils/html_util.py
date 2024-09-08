@@ -51,9 +51,9 @@ def remove_html(text):
     # 清除注释
     text = text.strip().replace("<!--.*?-->", "")
     # 样式 内容删除
-    text = re.sub(re.compile('<\s*style[^>]*>[^<]*<\s*/\s*style\s*>', re.I), '', text)
+    text = re.sub(re.compile(r'<\s*style[^>]*>[^<]*<\s*/\s*style\s*>', re.I), '', text)
     # java script 内容删除
-    text = re.sub(re.compile('<\s*script[^>]*>[^<]*<\s*/\s*script\s*>', re.I), '', text)
+    text = re.sub(re.compile(r'<\s*script[^>]*>[^<]*<\s*/\s*script\s*>', re.I), '', text)
     # 标题换行: </title> ==> 换行符
     text = re.sub(r'</[Tt][Ii][Tt][Ll][Ee]>', '\n', text)
     # tr换行: </tr> ==> 换行符

@@ -48,6 +48,17 @@ def underscore(word):
     return word.lower()
 
 
+def get_param():
+    """获取参数"""
+    try:
+        post_data = request.data
+        if post_data and isinstance(post_data, (bytes, bytearray)):
+            post_data = post_data.decode()
+        return post_data
+    except:
+        return None
+
+
 class ParsedRequest(object):
     """ This class, by means of its attributes, describes a client request.
     """

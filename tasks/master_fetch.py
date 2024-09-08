@@ -1,21 +1,29 @@
 # -*- coding:utf-8 -*-
-import time
 import uuid
 import logging
+from datetime import datetime
+from celery.schedules import crontab
 
-from celery import current_app
 import settings
+from celery import current_app
 from tasks.fetch import process as fetch_task
-
+from tasks.master_notify import NotifyTask
 
 logger = logging.getLogger(__name__)
+
+
+# 约定每个定时任务文件都需要定义一个 SCHEDULE 变量，用于定义定时任务(不定义这个变量则不认为是定时任务)
+SCHEDULE = {
+    "schedule": 5,  # 每 5 秒执行一次，也可以用 crontab 函数定义定时任务
+    # 'schedule': crontab(minute='*/1'),  # 每分钟执行一次
+}
 
 
 # 定义任务函数，并使用celery.task装饰器进行装饰； task()参数：
 # name:可以显示指定任务的名字；
 # serializer：指定序列化的方法；
 # bind:一个bool值，设置是否绑定一个task的实例，如果把绑定，task实例会作为参数传递到任务方法中，可以访问task实例的所有的属性，即前面反序列化中那些属性
-@current_app.task(name='my_celery_mq.tasks.master_fetch', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
+@current_app.task(name=f'{settings.APP_NAME}.{__name__}', queue=settings.FETCH_TASK_QUEUE, bind=True)  # , priority=0)
 def process(self):
     """
     抛出子任务
@@ -23,11 +31,19 @@ def process(self):
     使用self.request访问相关的属性，如：self.request.id, self.request.args, self.request.kwargs
     retries = int(self.request.retries)  # 重试次数
     """
-    _id = uuid.uuid4()
-    _t = int(time.time())
+    _id = uuid.uuid4()  # 测试这两种类型的异步任务传参
+    _t = datetime.now()
     logger.info(f'master_fetch task id: {_id}, ts:{_t}')
 
-    fetch_task.delay(str(_id), _t)
+    # 异步任务的调用1 (使用 process 函数写法的异步任务)
+    fetch_task.delay([_id], _t)  # 异步调用(不能直接获取结果)
+    fetch_task([_id], _t)  # 同步调用，可以直接获取函数的返回值
+
+    # 异步任务的调用2 (继承 CeleryTask 类写法的异步任务)
+    NotifyTask().delay([_id], _t)  # 异步调用(原生写法)
+    NotifyTask.delay([_id], _t)  # 异步调用(基类添加的使用方式，静态函数)
+    NotifyTask.sync([_id], _t)  # 同步调用(基类添加的使用方式，静态函数)，可以直接获取 run 方法的返回值
+
     # task.delay():这是apply_async方法的别名,但接受的参数较为简单；
     # task.apply_async(args=[arg1, arg2], kwargs={key:value, key:value},
     #     countdown : 设置该任务等待一段时间再执行，单位为s；
