@@ -84,10 +84,12 @@ def get_html(url, headers=None, return_response=False, use_zip=False, repeat_tim
                 response.close()
                 if return_json and res:
                     res = json.loads(res)
+                '''
                 if len(f"{headers}") <= 200:
                     logging.info(f"{method} 请求url:{url}, headers:{headers}, param:{data}, 状态码:{status_code}, 返回:{res}")
                 else:
                     logging.info(f"{method} 请求url:{url}, param:{data}, 状态码:{status_code}, 返回:{res}")
+                # '''
                 return res
         except IncompleteRead as e:
             res = e.partial
@@ -181,6 +183,12 @@ def get_zip_response(response):
             page_html = gzip_decode(page_html)
         elif encoding == 'deflate':
             page_html = zlib_decode(page_html)
+        elif encoding == 'br':
+            import brotli  # pip install brotli==1.1.0
+            page_html = brotli.decompress(page_html)
+        elif encoding == 'zstd':
+            import zstd
+            page_html = zstd.decompress(page_html)
     return page_html
 
 
