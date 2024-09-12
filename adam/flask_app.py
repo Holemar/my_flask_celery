@@ -14,6 +14,7 @@ import logging
 import importlib
 import inspect
 import argparse
+import multiprocessing
 
 import celery
 from flask import Flask
@@ -101,6 +102,7 @@ class Adam(Flask):
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
 
+        self.load_route()
         current_app = self
 
     def run(self, debug=None, **options):
@@ -113,12 +115,12 @@ class Adam(Flask):
         parser.add_argument('--prefetch-multiplier', default='')
         parser.add_argument('-f', '--logfile', default='')
         parser.add_argument('-p', '--port', default='')
+        parser.add_argument('-w', '--workers', default=f'{multiprocessing.cpu_count()}')  # 启动的进程数
         parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
         add_file_handler(args.logfile, args.loglevel)
 
         if args.mode in ('route', 'api', 'gevent', 'web'):
-            self.load_route()
             self.host = os.environ.get('HOST') or '0.0.0.0'
             self.port = int(os.environ.get('PORT') or '8000')
             if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
@@ -140,11 +142,19 @@ class Adam(Flask):
             dapp = DebuggedApplication(self, evalex=True)
             server = pywsgi.WSGIServer((self.host, self.port), dapp)
             server.serve_forever()
-        elif args.mode == 'web':
+        elif args.mode == 'web':  # 启动gunicorn服务器，效果不理想，改成直接 gunicorn 启动
+            import gunicorn
             from gevent import monkey, pywsgi
+            from gunicorn.app.wsgiapp import WSGIApplication
             monkey.patch_all()
-            # uwsgi --socket 0.0.0.0:5000 -w main:app  # -w 指定wsgi模块，main:app 是指wsgi模块的app变量名
-            # uwsgi --http 0.0.0.0:8000 --master --gevent -p 4 -w main:app  # -master 选项指定标准的worker管理器，-p 4 指定worker进程数
+            app_module = os.path.splitext(sys.argv[0])[0]
+            prog = inspect.getfile(gunicorn)
+            prog = prog.rstrip('__init__.py').rstrip(os.sep)
+            # print('argv:', sys.argv)
+            # print('app_module:', app_module)
+            sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',  '-k', 'gevent', f'{app_module}:app']
+            # print('after argv:', sys.argv)
+            WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]", prog=None).run()
         elif args.mode == 'worker':
             celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
             if args.concurrency:
@@ -159,6 +169,8 @@ class Adam(Flask):
         elif args.mode == 'shell':
             from IPython import embed
             from .utils.serializer import mongo_to_dict
+            app = self
+            celery_app = self.celery
             with self.app_context():
                 embed(header='Shell')
         else:

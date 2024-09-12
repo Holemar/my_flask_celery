@@ -56,6 +56,8 @@ zope.interface==7.0.3
 zope.event==5.0
 gevent==24.2.1
 
+gunicorn==23.0.0
+
 # ipython 安装
 asttokens==2.4.1
 pure-eval==0.2.3

@@ -7,10 +7,10 @@ import time
 import logging
 
 from __init__ import get, post, set_host  # 导入环境
-from tests.apis.thread_util import ThreadPool
+from adam.utils.thread_util import ThreadPool
 
 THREAD_LINE = 20  # 线程数
-repeat_number = 100  # 重复次数
+repeat_number = 500  # 重复次数
 error_time = 0  # 出错次数
 
 
@@ -29,7 +29,7 @@ def test_single(*args, **kwargs):
         assert "version" in resp_dict
         assert 0 < resp_dict.get("duration") < 1  # 响应时间在0s~1s之间
     except Exception as e:
-        logging.error(u'请求出错:%s' % e)
+        logging.exception(u'请求出错:%s' % e)
         error_time += 1
     # 记录总运行时间
     run_time = time.time() - start_time
@@ -72,8 +72,8 @@ def all_test():
 
 
 if __name__ == "__main__":
-    set_host('http://localhost:8000/')
-    # set_host('http://54.219.179.117:8134/')  # 线上环境
+    # set_host('http://localhost:8000/')
+    set_host('http://54.151.30.253:8134/')  # 线上环境
 
     all_test()
     ThreadPool.stop()
