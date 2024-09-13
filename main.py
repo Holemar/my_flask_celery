@@ -17,9 +17,6 @@ if __name__ == '__main__':
     # 程序启动
     app.run(debug=settings.DEBUG)
 else:
-    # 程序运行在uwsgi服务器上
-    from gevent import monkey
-    from adam.utils.log_filter import add_file_handler
-    monkey.patch_all()
-    add_file_handler('logs/api.log', 'INFO')
+    # 程序运行在wsgi服务器上
+    app.init_wsgi_server()
 

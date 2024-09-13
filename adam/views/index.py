@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import os
+import sys
 import time
 import logging
 from flask import jsonify, request, current_app
@@ -31,6 +32,7 @@ def status():
         # 版本更新时间
         message['update_time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
         message['now'] = time.strftime('%Y-%m-%d %H:%M:%S')  # 系统时间,用来核对系统时间是否正确
+        # message['argv'] = sys.argv  # 系统启动参数
         # 任务队列情况
         message['beat'] = get_beat()
         workers = get_workers()

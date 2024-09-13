@@ -10,6 +10,7 @@
 """
 import os
 import sys
+import ctypes
 import logging
 import importlib
 import inspect
@@ -33,6 +34,8 @@ from .middlewares import Middleware
 
 logger = logging.getLogger(__name__)
 current_app = None
+COUNTER = multiprocessing.Value(ctypes.c_int, 0)  # wsgi子进程计数器
+LOCK = multiprocessing.Lock()
 
 
 class Adam(Flask):
@@ -102,7 +105,6 @@ class Adam(Flask):
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
             celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
 
-        self.load_route()
         current_app = self
 
     def run(self, debug=None, **options):
@@ -118,7 +120,8 @@ class Adam(Flask):
         parser.add_argument('-w', '--workers', default=f'{multiprocessing.cpu_count()}')  # 启动的进程数
         parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
-        add_file_handler(args.logfile, args.loglevel)
+        logfile = args.logfile or f'logs/{args.mode}.log'
+        add_file_handler(logfile, args.loglevel)
 
         if args.mode in ('route', 'api', 'gevent', 'web'):
             self.host = os.environ.get('HOST') or '0.0.0.0'
@@ -126,6 +129,7 @@ class Adam(Flask):
             if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
                 self.port = int(args.port)
             self.debug = debug
+            self.load_route()  # 加载middleware、view
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
         if args.mode == 'route':
             print(self.url_map)
@@ -142,19 +146,16 @@ class Adam(Flask):
             dapp = DebuggedApplication(self, evalex=True)
             server = pywsgi.WSGIServer((self.host, self.port), dapp)
             server.serve_forever()
-        elif args.mode == 'web':  # 启动gunicorn服务器，效果不理想，改成直接 gunicorn 启动
+        elif args.mode == 'web':  # 启动gunicorn服务器，也可以改成直接 gunicorn 启动
             import gunicorn
-            from gevent import monkey, pywsgi
-            from gunicorn.app.wsgiapp import WSGIApplication
-            monkey.patch_all()
+            from gunicorn.app.wsgiapp import run
             app_module = os.path.splitext(sys.argv[0])[0]
             prog = inspect.getfile(gunicorn)
             prog = prog.rstrip('__init__.py').rstrip(os.sep)
-            # print('argv:', sys.argv)
-            # print('app_module:', app_module)
-            sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',  '-k', 'gevent', f'{app_module}:app']
-            # print('after argv:', sys.argv)
-            WSGIApplication("%(prog)s [OPTIONS] [APP_MODULE]", prog=None).run()
+            # ugly: 通过修改 sys.argv 实现 gunicorn 启动参数的传递
+            sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',  '-k', 'gevent',
+                        '--log-level=' + args.loglevel.lower(), '--log-file=logs/web_error.log', f'{app_module}:app']
+            run(prog="gunicorn")
         elif args.mode == 'worker':
             celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
             if args.concurrency:
@@ -175,6 +176,28 @@ class Adam(Flask):
                 embed(header='Shell')
         else:
             print('Invalid Usage..')
+
+    def init_wsgi_server(self):
+        """
+        程序运行在wsgi服务器上，需要执行的初始化操作(子进程启动时调用)
+        """
+        logger.info('Init wsgi server')
+        self.load_route()  # 加载middleware、view
+
+        ''' # 主进程已经写了日志文件，子进程就不用重复写了
+        # 各子进程使用独立的日志文件，因为共用会导致日志内容混乱甚至丢失
+        global COUNTER
+        with LOCK:
+            COUNTER.value += 1
+            item = COUNTER.value
+
+        log_file = f'logs/web{item}.log'
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--log-level', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
+        args, unknown_args = parser.parse_known_args()
+        add_file_handler(log_file, args.log_level.upper())
+        logger.info('set log file: %s, level: %s', log_file, args.log_level)
+        '''
 
     def load_route(self):
         # 加载view
@@ -208,6 +231,11 @@ class Adam(Flask):
         with self.app_context():
             # 注册特殊页面(首页、静态文件、status、错误处理等)
             from .views import index
+            try:
+                importlib.reload(index)  # wsgi 服务器下，子进程会不再加载，导致少了这些接口
+            except AssertionError:
+                pass
+        logger.info('load_route views: %s, urls: %s', len(self.views), len(list(self.url_map.iter_rules())))
 
     def load_views(self, path):
         """

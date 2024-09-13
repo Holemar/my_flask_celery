@@ -3,12 +3,16 @@
     Use Python 3.8 or above
     本项目实际开发环境: python3.11
 
-| 功能               | 命令                            |
-|------------------|-------------------------------|
-| 启动 api           | python3 fc_agent.py -m api    |
-| 启动 clery beat    | python3 fc_agent.py -m beat   |
-| 启动 clery worker  | python3 fc_agent.py -m worker |
-| 查看 api 接口        | python3 fc_agent.py -m route  |
+| 功能               | 命令                             |
+|------------------|--------------------------------|
+| 启动 api 普通模式      | python3 fc_agent.py -m api     |
+| 启动 api 正式发布模式    | python3 fc_agent.py -m web     |
+| 启动 celery beat   | python3 fc_agent.py -m beat    |
+| 启动 celery worker | python3 fc_agent.py -m worker  |
+| 查看 api 接口        | python3 fc_agent.py -m route   |
+| 进入交互模式           | python3 fc_agent.py -m shell   |
+| 查看 celery 管理后台   | python3 fc_agent.py -m monitor |
+
 
 # 项目说明
 - 本项目为使用AI为企业提供咨询类服务。
