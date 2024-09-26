@@ -123,14 +123,15 @@ class Adam(Flask):
         logfile = args.logfile or f'logs/{args.mode}.log'
         add_file_handler(logfile, args.loglevel)
 
+        self.host = os.environ.get('HOST') or '0.0.0.0'
+        self.port = int(os.environ.get('PORT') or '8000')
+        if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
+            self.port = int(args.port)
         if args.mode in ('route', 'api', 'gevent', 'web'):
-            self.host = os.environ.get('HOST') or '0.0.0.0'
-            self.port = int(os.environ.get('PORT') or '8000')
-            if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
-                self.port = int(args.port)
             self.debug = debug
             self.load_route()  # 加载middleware、view
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
+
         if args.mode == 'route':
             print(self.url_map)
             print('views:', self.views)
@@ -167,7 +168,8 @@ class Adam(Flask):
         elif args.mode == 'beat':
             self.celery.start(argv=celery_argv + ['beat', '-l', args.loglevel] + unknown_args)
         elif args.mode == 'monitor':
-            self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth])
+            self.celery.start(argv=celery_argv + ['flower', '--basic-auth=' + args.basic_auth,
+                                                  '--address=' + self.host, '--port=' + str(self.port)])
         elif args.mode == 'shell':
             from IPython import embed
             from .utils.serializer import mongo_to_dict

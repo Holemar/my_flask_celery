@@ -225,3 +225,10 @@ class CELERY_CONFIG(object):
     # 设置log格式
     worker_log_format = '[%(asctime)s] [%(module)s.%(funcName)s:%(lineno)s] %(levelname)s: %(message)s'
     worker_task_log_format = '[%(asctime)s] [%(levelname)s/%(task_name)s %(task_id)s]: %(message)s'
+
+
+# celery 监控账号密码
+MONITOR_USERNAME = os.environ.get('MONITOR_USERNAME', 'admin')
+MONITOR_PASSWORD = os.environ.get('MONITOR_PASSWORD', '123456')
+# celery 任务数量限制,超过则认为任务堆积过多
+LIMIT_TASK = int(os.environ.get('LIMIT_TASK') or 1000)
