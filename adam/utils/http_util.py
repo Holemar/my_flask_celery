@@ -45,7 +45,7 @@ base_headers = {
 
 
 def get_html(url, headers=None, return_response=False, use_zip=False, repeat_time=http_repeat_time,
-             method=None, data=None, timeout=TIMEOUT, force_header=False, send_json=False, return_json=False, **kwarge):
+             method='GET', data=None, timeout=TIMEOUT, force_header=False, send_json=False, return_json=False, **kwarge):
     """发送请求获取网页内容
     :param {string} url: 请求地址
     :param {dict} headers: 请求头
@@ -146,7 +146,8 @@ def change_send_data(url, method, data, send_json=False):
     :return: 修改后的请求参数
     """
     # get 方式的参数处理, 参数拼接
-    if method == 'GET' and data:
+    method = method or 'GET'
+    if method.upper() == 'GET' and data:
         url += "&" if "?" in url else "?"
         if isinstance(data, dict):
             data = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))) for k, v
@@ -159,11 +160,11 @@ def change_send_data(url, method, data, send_json=False):
     elif send_json:
         if data and not isinstance(data, (bytes, str)):
             data = json.dumps(data)
-            data = bytes(data, 'utf8')
     elif data and isinstance(data, dict):
         data = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))) for k, v in
                 data.items()}
         data = parse.urlencode(data)
+    if data and isinstance(data, str):
         data = bytes(data, 'utf8')
     return url, data
 

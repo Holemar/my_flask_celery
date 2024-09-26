@@ -153,7 +153,8 @@ class Adam(Flask):
             prog = inspect.getfile(gunicorn)
             prog = prog.rstrip('__init__.py').rstrip(os.sep)
             # ugly: 通过修改 sys.argv 实现 gunicorn 启动参数的传递
-            sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',  '-k', 'gevent',
+            sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',
+                        # '-k', 'gevent',  # 这会自动 monkey patch，可能会导致 http 请求出问题
                         '--log-level=' + args.loglevel.lower(), '--log-file=logs/web_error.log', f'{app_module}:app']
             run(prog="gunicorn")
         elif args.mode == 'worker':

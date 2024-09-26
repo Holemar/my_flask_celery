@@ -8,6 +8,9 @@ logger = logging.getLogger(__name__)
 
 class BaseError(object, metaclass=CodeType):
 
+    crawl_url = (391, '爬虫获取访问不到网页内容！')
+    crawl_publish_time = (392, '爬虫获取不到发布时间！')
+    crawl_content = (393, '爬虫获取不到发布内容！')
     crawl_error = (399, '爬虫获取网页信息异常！')
 
     unknown_error = (400, '未知错误！')
