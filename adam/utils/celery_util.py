@@ -136,33 +136,36 @@ def load_task(path):
     from ..celery_base_task import BaseTask
     current_app.Task = BaseTask
 
-    task_lookup = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
+    task_classes = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
+    task_processors = lambda x: isinstance(x, Task)
     modules = import_submodules(path)
     for k, _cls in modules.items():
-        task_name = None
-        members = inspect.getmembers(_cls, task_lookup)
-        # 使用 process 装饰器的类
-        if hasattr(_cls, 'process') and isinstance(_cls.process, Task):
-            _task_name = _cls.process.name
-            if _task_name.endswith(k):
-                logger.debug('Loading Task (PRC): %s', k)
-                current_app.register_task(_cls.process)
-                task_name = _task_name
-        # 继承 Task 的类
-        if task_name is None and members:
-            for _name, _task_cls in members:
-                _task_name = _task_cls.name
-                if _task_name.endswith(k):
-                    logger.debug('Loading Task (CLS): %s', _name)
-                    _task = _task_cls()
-                    current_app.register_task(_task)
-                    task_name = _task_name
-        # 加载定时器
-        beat_schedule = getattr(_cls, 'SCHEDULE', None)
-        if task_name and task_name.endswith(k) and beat_schedule:
-            beat_schedule['task'] = task_name
-            BEAT_SCHEDULE[task_name] = beat_schedule
+        # 使用 @celery.task 装饰器的异步任务函数
+        for _name, _task_func in inspect.getmembers(_cls, task_processors):
+            task_name = _task_func.name
+            logger.debug('Loading Task (PRC): %s', k)
+            current_app.register_task(_task_func)
+            if hasattr(_task_func, 'schedule') and getattr(_task_func, 'schedule', None):
+                BEAT_SCHEDULE[task_name] = {
+                    'task': task_name,
+                    'schedule': getattr(_task_func, 'schedule', None)
+                }
+                _task_func.schedule = None  # 去掉 schedule 属性，避免重复执行
+                # delattr(_task_func, 'schedule')
+        # 继承 CeleryTask 类写法的异步任务类
+        for _name, _task_cls in inspect.getmembers(_cls, task_classes):
+            task_name = _task_cls.name
+            logger.debug('Loading Task (CLS): %s', _name)
+            _task = _task_cls()
+            current_app.register_task(_task)
+            if hasattr(_task_cls, 'schedule') and getattr(_task_cls, 'schedule', None):
+                BEAT_SCHEDULE[task_name] = {
+                    'task': task_name,
+                    'schedule': getattr(_task_cls, 'schedule', None)
+                }
+                delattr(_task_cls, 'schedule')  # 去掉 schedule 属性，避免重复执行
     current_app.conf.beat_schedule = BEAT_SCHEDULE
+    logger.info(f'BEAT_SCHEDULE:{BEAT_SCHEDULE}')
 
 
 def delete_repeat_task():
