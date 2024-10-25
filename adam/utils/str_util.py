@@ -71,9 +71,12 @@ def to_utf8_str(content):
         return content.decode("utf-8", "ignore")
     elif isinstance(content, str):
         # unicode-escape
-        try_s = [ord(a) for a in content if ord(a) <= 256]
-        if len(try_s) == len(content):
-            return bytes(try_s).decode("utf-8")
+        try:
+            try_s = [ord(a) for a in content if ord(a) <= 256]
+            if len(try_s) == len(content):
+                return bytes(try_s).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError) as e:
+            pass
         # try code list
         for encoding in ENCODE_CODING_LIST:
             try:

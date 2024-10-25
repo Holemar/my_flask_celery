@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import sys
 import logging
 import inspect
 import pkgutil
@@ -9,38 +10,36 @@ import importlib
 logger = logging.getLogger(__name__)
 
 
-class VirtualObject(object):
-    """虚拟类，将 dict 转成 Object"""
-    def __init__(self, values: dict = None, default=None):
-        self._values = values
-        self._default = default
-        if values:
-            for k, v in values.items():
-                setattr(self, k, v)
+def import_string(import_name: str):
+    """Imports an object based on a string.  This is useful if you want to
+    use import paths as endpoints or something similar.  An import path can
+    be specified either in dotted notation (``xml.sax.saxutils.escape``)
+    or with a colon as object delimiter (``xml.sax.saxutils:escape``).
 
-    def __getattr__(self, name):
-        return self._default
+    :param import_name: the dotted name for the object to import.
+    :return: imported object
+    """
+    import_name = import_name.replace(":", ".")
+    try:
+        try:
+            __import__(import_name)
+        except ImportError:
+            if "." not in import_name:
+                raise
+        else:
+            return sys.modules[import_name]
 
-    def add_values(self, values: dict):
-        for k, v in values.items():
-            if not hasattr(self, k):
-                setattr(self, k, v)
-                self._values[k] = v
-            elif isinstance(v, dict):  # dict 合并，但不递归，也不转换内嵌层级为 Object
-                if k in self._values and isinstance(self._values[k], dict):
-                    self._values[k].update(v)
-            # 是一个类，逐个属性填充
-            elif type(v).__name__ == 'type':
-                origin_object = self._values.get(k)
-                for key in dir(v):
-                    if key.startswith('__'):
-                        continue
-                    if hasattr(origin_object, key):
-                        continue
-                    setattr(origin_object, key, getattr(v, key))
+        module_name, obj_name = import_name.rsplit(".", 1)
+        module = __import__(module_name, globals(), locals(), [obj_name])
+        try:
+            return getattr(module, obj_name)
+        except AttributeError as e:
+            raise ImportError(e) from None
 
-    def to_dict(self):
-        return self._values
+    except ImportError as e:
+        pass
+
+    return None
 
 
 def import_submodules(package, recursive=True):

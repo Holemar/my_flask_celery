@@ -278,6 +278,8 @@ class ResourceView(object):
             obj = return_data(data=obj)
         elif isinstance(obj, Document):
             obj = return_data(data=obj)
+        elif obj is None:
+            obj = return_data()
         response = serialize('_root', obj, None, included=included)
         return Response(json.dumps(response), status=200, mimetype='application/json')
     
@@ -307,7 +309,7 @@ class ResourceView(object):
         # logger.error(res, exc_info=ex)
         logger.exception("请求异常 %s %s: %s，参数:%s", request.method, request.full_path, ex, get_param())
 
-        return Response(json.dumps(res), status=400, mimetype='application/json')
+        return Response(json.dumps(res), status=200, mimetype='application/json')
 
     def has_permission(self, action, endpoint, instance=None):
         """

@@ -22,8 +22,8 @@ from flask import Flask
 from mongoengine import register_connection
 from mongoengine.fields import ListField, ReferenceField, LazyReferenceField, EmbeddedDocumentField
 
-from .utils import celery_util
-from .utils.import_util import import_submodules, load_modules
+from .utils import celery_util, config_util
+from .utils.import_util import import_submodules, load_modules, import_string
 from .utils.url_util import RegexConverter, underscore
 from .utils.log_filter import WerkzeugLogFilter, add_file_handler
 from .views import ResourceView, Blueprint
@@ -328,7 +328,7 @@ class Adam(Flask):
             self.config.update(self.settings)
         elif isinstance(self.settings, str):
             try:
-                settings = __import__(self.settings)
+                settings = import_string(self.settings)
                 for key in dir(settings):
                     if not key.isupper():
                         continue
@@ -352,6 +352,7 @@ class Adam(Flask):
 
         # flask-pymongo compatibility
         self.config['MONGO_CONNECT'] = self.config['MONGO_OPTIONS'].get('connect', True)
+        config_util.config.add_values(self.config)
 
     @property
     def api_prefix(self):

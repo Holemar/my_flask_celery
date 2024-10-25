@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 
 def custom_send_task(self, *args, **kwargs):
-    """celery 发任务补丁,每个beat及worker子任务执行前都经过它"""
+    """celery 发任务补丁,beat及worker抛出任务前都经过它(如果worker一直不抛出任务，则不会调用)"""
     logger.debug(f'celery.Celery.send_task args:{args}, kwargs:{kwargs}')
     set_run()
     return self._old_send_task(*args, **kwargs)

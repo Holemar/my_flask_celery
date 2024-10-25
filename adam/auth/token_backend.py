@@ -38,6 +38,7 @@ class TokenBackend(BasicBackend):
         request.jwt = None
         request.user = None
         request.session = None
+        request.language = request.headers.get('language')
 
         if credential:
             try:
@@ -58,6 +59,8 @@ class TokenBackend(BasicBackend):
                         request.session = session_object
                         user = user_mode.objects(id=session_object.user.id).first()
                         request.user = user
+                        if not request.language and hasattr(user, 'language'):
+                            request.language = user.language.value
                     # else:
                     #     BaseError.unauthorized('token does not exists')
             except (jwt.DecodeError, jwt.ExpiredSignatureError) as ex:

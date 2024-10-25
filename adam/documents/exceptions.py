@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import json
-
 
 class CommonException(Exception):
     def __init__(self, code, message):
@@ -21,7 +19,7 @@ class CommonException(Exception):
 class BussinessCommonException(Exception):
     errors = {}  # 子项目需要对这个字典赋值
 
-    def __init__(self, code, message, status_code=400, data=None):
+    def __init__(self, code, message, status_code=200, data=None):
         self._code = code
         self._message = message
         self._status_code = status_code
@@ -48,7 +46,7 @@ class BussinessCommonException(Exception):
     def data(self, value):
         self._data = value
 
-    def __call__(self, message=None, status_code=400, data=None):
+    def __call__(self, message=None, status_code=200, data=None):
         if message:
             self._message = message
         if status_code:

@@ -46,5 +46,5 @@ class CacheDocument(ResourceDocument):
             return cls._objects
 
         # 读取全部的配置
-        cls._objects = list(cls.objects(**kwargs).all())
+        cls._objects = list(cls.objects.filter(**kwargs).all())
         return cls._objects

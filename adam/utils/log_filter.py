@@ -218,8 +218,7 @@ def task_logger_setup_handler(*args, **kwargs):
     """
     if file_handler:
         logger.addHandler(file_handler)
-    else:
-        logger.addHandler(stdout_handler)
+    logger.addHandler(stdout_handler)
     logger.addHandler(stderr_handler)
     logger.addHandler(db_handler)
 
@@ -236,8 +235,7 @@ def global_logger_setup_handler(*args, **kwargs):
 
     if file_handler:
         logger.addHandler(file_handler)
-    else:
-        logger.addHandler(stdout_handler)
+    logger.addHandler(stdout_handler)
     logger.addHandler(stderr_handler)
     logger.addHandler(db_handler)
 

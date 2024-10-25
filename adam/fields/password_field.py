@@ -3,14 +3,11 @@
 密码字段
 """
 
-import os
 import hashlib
 from mongoengine.fields import BaseField
 from abc import ABCMeta, abstractmethod
 from ..utils.rc4 import encode as rc4_encode, decode as rc4_decode
-
-# 加密 key 值
-SECRET_SALT = os.environ.get('PASSWORD_SECRET') or os.environ.get('JWT_SECRET', 'befxjbubeg0lacoazvorsokhuofadav1')
+from ..utils.config_util import config
 
 
 class IPassword(metaclass=ABCMeta):
@@ -34,6 +31,8 @@ class IPassword(metaclass=ABCMeta):
 
 class MD5PasswordImpl(IPassword):
     def __init__(self, *args, **kwargs):
+        # 加密 key 值
+        SECRET_SALT = config.PASSWORD_SECRET or config.JWT_SECRET or 'be9xj6u6eg0la3o2zv5rs8khu7fa0av1'
         self.salt = kwargs.get('salt', SECRET_SALT)
 
     def generate_password(self, password):
@@ -43,6 +42,8 @@ class MD5PasswordImpl(IPassword):
 
 class RC4PasswordImpl(IPassword):
     def __init__(self, *args, **kwargs):
+        # 加密 key 值
+        SECRET_SALT = config.PASSWORD_SECRET or config.JWT_SECRET or 'be9xj6u6eg0la3o2zv5rs8khu7fa0av1'
         self.salt = kwargs.get('salt', SECRET_SALT)
 
     def generate_password(self, password):

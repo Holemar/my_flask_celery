@@ -94,7 +94,7 @@ def repr_value(value):
         this_value = {}  # 不能改变原参数
         for key1, value1 in value.items():
             # 字典里面的 key 也转成 unicode 编码
-            key1 = repr_value(key1).replace('.', '。').replace('$', '¥')
+            key1 = repr_value(str(key1)).replace('.', '。').replace('$', '¥')
             this_value[key1] = repr_value(value1)
         return this_value
     # model 对象，友好显示出来

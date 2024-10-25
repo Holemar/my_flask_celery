@@ -2,10 +2,8 @@
 """Fields."""
 
 # MongoEngine fields
-from mongoengine.fields import StringField, ListField, \
-    ReferenceField, LazyReferenceField, DictField, IntField, \
-    BooleanField, EmailField, DateTimeField, ObjectIdField, \
-    EmbeddedDocumentField, FloatField
+from mongoengine.fields import StringField, ListField, ReferenceField, LazyReferenceField, DictField, IntField, \
+    BooleanField, EmailField, DateTimeField, ObjectIdField, EmbeddedDocumentField, FloatField, DecimalField
 
 
 # customize fields
