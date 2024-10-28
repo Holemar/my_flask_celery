@@ -3,7 +3,7 @@
 from adam.documents import ResourceDocument, BaseError
 from adam.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
                          RelationField, DictField)
-from .enums import UserEnum
+from .enums import UserEnum, Language
 
 
 class User(ResourceDocument):
@@ -24,6 +24,7 @@ class User(ResourceDocument):
     mobile = StringField()  # 手机号码
     password = PasswordField()  # 密码
     user_type = EnumField(enum=UserEnum, default=UserEnum.USER)
+    language = EnumField(enum=Language, default=Language.CHINESE)  # 语言偏好
 
     default_project = LazyReferenceField(document_type='Project', db_field='default_project_id')  # 用户默认的项目
     projects = RelationField(document_type='Project', relation_type='has_many', target_field='user')  # 用户有权限的项目

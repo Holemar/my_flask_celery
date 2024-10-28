@@ -16,3 +16,11 @@ class RelevantType(StrEnum):
     neutral = 'neutral'
     unlabeled = 'unlabeled'
 
+
+class Language(StrEnum):
+    ENGLISH = 'english'
+    CHINESE = 'chinese'
+    JAPANESE = 'japanese'
+    KOREAN = 'korean'
+    VIETNAMESE = 'vietnamese'
+

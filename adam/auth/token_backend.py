@@ -64,7 +64,7 @@ class TokenBackend(BasicBackend):
                     # else:
                     #     BaseError.unauthorized('token does not exists')
             except (jwt.DecodeError, jwt.ExpiredSignatureError) as ex:
-                logger.error('jwt decode error: %s', str(ex))
+                logger.warning('jwt decode error: %s', str(ex))
                 BaseError.unauthorized('Invalid jwt token')
 
         return credential
