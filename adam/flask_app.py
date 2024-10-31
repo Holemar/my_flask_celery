@@ -117,6 +117,7 @@ class Adam(Flask):
         parser.add_argument('--prefetch-multiplier', default='')
         parser.add_argument('-f', '--logfile', default='')
         parser.add_argument('-p', '--port', default='')
+        parser.add_argument('-t', '--timeout', default='60')  # 超时时间，保持连接时间
         parser.add_argument('-w', '--workers', default=f'{multiprocessing.cpu_count()}')  # 启动的进程数
         parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
@@ -155,6 +156,7 @@ class Adam(Flask):
             prog = prog.rstrip('__init__.py').rstrip(os.sep)
             # ugly: 通过修改 sys.argv 实现 gunicorn 启动参数的传递
             sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',
+                        f'--timeout={args.timeout}', f'--graceful-timeout={args.timeout}', '--keep-alive=5',  # 超时时间
                         # '-k', 'gevent',  # 这会自动 monkey patch，可能会导致 http 请求出问题
                         '--log-level=' + args.loglevel.lower(), '--log-file=logs/web_error.log', f'{app_module}:app']
             run(prog="gunicorn")
