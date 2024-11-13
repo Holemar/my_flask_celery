@@ -193,6 +193,8 @@ AUTHENTICATION_BACKENDS = [
     'adam.auth.token_backend'
 ]
 
+TIME_ZONE = os.environ.get('TIME_ZONE', 'Asia/Shanghai')  # 时区
+
 BROKER_MODE = os.environ.get('BROKER_MODE') or 'mongodb'
 # MASTER_NAME = 'mymaster'
 MASTER_NAME = os.environ.get('MASTER_NAME') or 'mymaster'
@@ -223,8 +225,9 @@ class CELERY_CONFIG(object):
     worker_max_tasks_per_child = int(os.environ.get('CELERYD_MAX_TASKS_PER_CHILD', 30)) or None  # 每个worker执行了多少任务就会死掉，默认是无限的。可防止内存泄露
     task_acks_late = os.environ.get('CELERY_ACKS_LATE', 'false').lower() in ('true', '1')  # 任务发送完成是否需要确认，这一项对性能有一点影响
 
-    timezone = 'Asia/Shanghai'  # 设置时区
+    timezone = TIME_ZONE  # 设置时区
     enable_utc = True  # UTC时区换算
+    broker_connection_retry_on_startup = True  # 连接失败重试
     # 设置log格式
     worker_log_format = '[%(asctime)s] [%(module)s.%(funcName)s:%(lineno)s] %(levelname)s: %(message)s'
     worker_task_log_format = '[%(asctime)s] [%(levelname)s/%(task_name)s %(task_id)s]: %(message)s'

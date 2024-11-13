@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
 import json
+import time
+import uuid
 import logging
-from datetime import datetime
+import decimal
+import datetime
 from enum import Enum
 
 from bson import ObjectId
@@ -24,18 +27,37 @@ def serialize(_root, obj, field_obj, depth=1, included=None, excluded=None):
     """
     result = None
     if obj is None:
-        return result
+        return None
 
     if isinstance(obj, (list, tuple, set)):
         result = []
         for item in obj:
             result.append(serialize(_root, item, None, depth, included=included, excluded=excluded))
+        return result
     elif isinstance(obj, dict):
         result = {}
         for k, v in obj.items():
             if excluded and k in excluded:
                 continue
             result[k] = serialize(k, v, None, depth, included=included, excluded=excluded)
+        return result
+    elif isinstance(obj, (str, int, float, bool, complex)):
+        result = obj
+    elif isinstance(obj, decimal.Decimal):
+        result = float(obj)
+    elif isinstance(obj, ObjectId):
+        return str(obj)
+    elif isinstance(obj, time.struct_time):
+        return time.strftime('%Y-%m-%dT%H:%M:%S', obj)
+    elif isinstance(obj, datetime.datetime):
+        return obj.isoformat()
+    elif isinstance(obj, datetime.date):
+        return obj.strftime('%Y-%m-%d')
+    elif isinstance(obj, uuid.UUID):
+        return obj.hex
+    elif isinstance(obj, Enum):
+        return obj.value
+
     elif isinstance(field_obj, GenericLazyReferenceField):
         if depth <= 2 or _root in included:
             model = app.models.get(field_obj.name.capitalize())
@@ -47,34 +69,26 @@ def serialize(_root, obj, field_obj, depth=1, included=None, excluded=None):
                     new_obj = model.objects(id=obj).first()
                 else:
                     logger.error('wrong lazy generic reference field')
-                result = serialize(_root, new_obj, None, depth, included=included)
+                return serialize(_root, new_obj, None, depth, included=included)
         else:
-            result = {'id': str(obj)}
-    elif isinstance(obj, ObjectId):
-        result = str(obj)
-    elif isinstance(obj, datetime):
-        result = obj.isoformat()
-
+            return {'id': str(obj)}
     elif isinstance(obj, LazyReference) or isinstance(field_obj, GenericLazyReferenceField):
         if depth <= 2 and included and _root in included:
-            result = serialize(_root, obj.fetch(), None, depth, included=included)
+            return serialize(_root, obj.fetch(), None, depth, included=included)
         else:
-            result = {'id': str(obj.id)}
+            return {'id': str(obj.id)}
     elif isinstance(obj, LazyRelation):
         if depth <= 2 and included and _root in included:
-            result = serialize(_root, obj.fetch(), None, depth, included=included)
-    elif isinstance(obj, Enum):
-        result = obj.value
+            return serialize(_root, obj.fetch(), None, depth, included=included)
     elif isinstance(obj, EmbeddedDocument):
         result = {}
         for field_name, field_obj in obj._fields.items():
-            value = None
             if field_name in _build_in_field_names or obj[field_name] is None or (excluded and field_name in excluded):
                 continue
-            value = serialize(
-                field_name, obj[field_name], field_obj, depth, included=included)
+            value = serialize(field_name, obj[field_name], field_obj, depth, included=included)
             if value is not None:
                 result[field_name] = value
+        return result
     elif isinstance(obj, Document):
         if depth <= 2:
             result = {}
@@ -112,8 +126,7 @@ def serialize(_root, obj, field_obj, depth=1, included=None, excluded=None):
                                 result[df_name] = val
                         else:
                             logger.error('Missing dynamic field %s', df_name)
-    elif isinstance(obj, (str, int, float, bool)):
-        result = obj
+            return result
     else:
         logger.warning('unknow type to serialize, %s', obj.__class__)
         result = obj
@@ -226,7 +239,7 @@ def mongo_to_dict(obj, index_only=False, exclude_fields=[], only_fields=[], date
                 else:
                     return_data.append((field_name, data))
             elif isinstance(_field_val, DateTimeField):
-                if isinstance(data, datetime):
+                if isinstance(data, datetime.datetime):
                     # return_data.append((field_name, data.strftime('%Y-%m-%d')))
                     if date_format == 'keep':
                         return_data.append((field_name, data))

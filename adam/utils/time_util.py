@@ -3,7 +3,7 @@
 """
 公用函数(时间处理)
 Created on 2014/10/16
-Updated on 2024/08/16
+Updated on 2024/11/12
 @author: Holemar
 """
 import re
@@ -15,7 +15,7 @@ import logging
 __all__ = ('add', 'sub', 'to_string', 'to_time', 'to_datetime', 'to_date', 'to_timestamp', 'to_datetime_time',
            'datetime_time_to_str', 'is_dst', 'add_datetime_time', 'sub_datetime_time', 'get_datetime', 'get_week_range',
            'get_month_range', 'get_month_list', 'get_time_string', 'calculate_age', 'utc_2_local', 'local_2_utc',
-           'spend_time')
+           'spend_time', 'get_time_zone')
 
 DEFAULT_FORMAT = '%Y-%m-%d %H:%M:%S'  # 默认时间格式
 DEFAULT_DATE_FORMAT = '%Y-%m-%d'  # 默认日期格式
@@ -239,6 +239,22 @@ def to_timestamp(value=None, from_format=None, default_now=False):
     return None
 
 
+def get_time_zone(value):
+    """获取时区"""
+    value = str(value.strip().upper())
+    re_utc = re.compile(r'^([+\-])([0-9]{1,2}):([0-9]{1,2})$')
+    mt = re_utc.match(value)
+    if not mt:
+        return None
+    minus = mt.group(1) == '-'
+    hours = int(mt.group(2))
+    minutes = int(mt.group(3))
+    if minus:
+        hours, minutes = -hours, -minutes
+    offset = datetime.timedelta(hours=hours, minutes=minutes)
+    return datetime.timezone(offset)
+
+
 def _str_2_datetime(value, from_format=None):
     """
     字符串转成时间
@@ -254,8 +270,10 @@ def _str_2_datetime(value, from_format=None):
         kw = match.groupdict()
         if kw['microsecond']:
             kw['microsecond'] = kw['microsecond'].ljust(6, '0')
-        kw.pop('tzinfo')  # utc not support
+        tz_info = kw.pop('tzinfo', None)
         kw = dict([(k, int(v)) for k, v in kw.items() if v is not None])
+        if tz_info:
+            kw['tzinfo'] = get_time_zone(tz_info)
         return datetime.datetime(**kw)
 
     # try to fix Chinese
@@ -366,7 +384,7 @@ def add(original_time=None, years=0, months=0, days=0, hours=0, minutes=0, secon
     :param {int} number: 倍数(默认1个,如果值为2表示所有添加时间是其它时间参数的2倍)
     :return {datetime}: 添加完时间后的时间
     """
-    after_time = to_datetime(original_time)
+    after_time = to_datetime(original_time, default_now=True)
     if after_time is None:
         logging.debug("时间参数无法解析:%s" % original_time)
         return None

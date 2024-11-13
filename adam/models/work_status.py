@@ -1,8 +1,18 @@
 # -*- coding:utf-8 -*-
+import os
 import datetime
 from mongoengine.fields import StringField, DateTimeField
 
 from ..documents import ResourceDocument
+
+# WorkStatus 记录的保存天数，超过则自动删除
+SAVE_WORK_STATUS_DAYS = int(os.environ.get('SAVE_WORK_STATUS_DAYS') or 2)
+
+
+def delete_work_status_log():
+    """删除旧记录"""
+    dt = datetime.datetime.utcnow() - datetime.timedelta(days=SAVE_WORK_STATUS_DAYS)
+    WorkStatus.objects(last_run_time__lte=dt).delete()
 
 
 class WorkStatus(ResourceDocument):

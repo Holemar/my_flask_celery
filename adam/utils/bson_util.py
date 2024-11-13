@@ -3,6 +3,7 @@
 import uuid
 import json
 import time
+import decimal
 import datetime
 
 from bson.objectid import ObjectId
@@ -35,6 +36,11 @@ class BsonEncoder(json.JSONEncoder):
                 '__type__': '__time__',
                 'value': time.mktime(obj)
             }
+        if isinstance(obj, decimal.Decimal):
+            return {
+                '__type__': '__decimal__',
+                'value': float(obj)
+            }
         return json.JSONEncoder.default(self, obj)
 
 
@@ -52,6 +58,8 @@ def bson_decoder(obj):
             return datetime.date.fromtimestamp(value)
         if _type == '__time__':
             return time.localtime(value)
+        if _type == '__decimal__':
+            return decimal.Decimal(value)
     return obj
 
 

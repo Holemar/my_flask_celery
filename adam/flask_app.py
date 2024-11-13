@@ -103,7 +103,7 @@ class Adam(Flask):
         if enable_celery:
             self.celery = celery.Celery(self.name)
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
-            celery_util.load_task(task_path)  # 加载 tasks 目录下的任务
+            celery_util.load_task(task_path, self.celery)  # 加载 tasks 目录下的任务
 
         current_app = self
 

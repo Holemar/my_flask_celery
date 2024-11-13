@@ -30,14 +30,13 @@ pip install -r requirements.txt
 - 前端 html 及 js 代码，打包发布在 `static` 目录下
 - 支持指定 URL 的接口，以及依赖 model 自动生成的接口
 
-## 查看允许状况
+## 查看状况
 - status 接口可以查看 celery 任务消耗情况。也可以查看 url、models、配置信息等
-- 不加参数，只查看 celery 状况： http://127.0.0.1:8000/status
-- 通过参数控制，可以查看 url、models、配置信息等： http://127.0.0.1:8000/status?url=1&models=1&config=1&beat=1
+- 不加参数，只查看 celery 状况： http://{host}:{port}/api/status
+- 通过参数控制，可以查看 url、models、配置信息等： http://{host}:{port}/api/status?url=1&models=1&beat=1
   1. `url=1` / `route=1`  查看所有的 api 路由
   2. `models=1` 查看所有的数据库 model
-  3. `config=1` 查看所有的配置信息
-  4. `beat=1` 查看所有的定时任务配置
+  3. `beat=1` 查看所有的定时任务配置
 
 
 # celery 任务开发说明

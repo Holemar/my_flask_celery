@@ -127,14 +127,15 @@ def get_beat_schedule():
     return beat_schedule
 
 
-def load_task(path):
+def load_task(path, app=None):
     """
     load class tasks
     """
     global BEAT_SCHEDULE
     # 重新赋予基类，必须在task注册之前，才可以使task继承基类
     from ..celery_base_task import BaseTask
-    current_app.Task = BaseTask
+    app = app or current_app
+    app.Task = BaseTask
 
     task_classes = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
     task_processors = lambda x: isinstance(x, Task)
@@ -143,8 +144,8 @@ def load_task(path):
         # 使用 @celery.task 装饰器的异步任务函数
         for _name, _task_func in inspect.getmembers(_cls, task_processors):
             task_name = _task_func.name
-            logger.debug('Loading Task (PRC): %s', k)
-            current_app.register_task(_task_func)
+            logger.info('Loading Task (PRC): %s %s', k, task_name)
+            app.register_task(_task_func)
             if hasattr(_task_func, 'schedule') and getattr(_task_func, 'schedule', None):
                 BEAT_SCHEDULE[task_name] = {
                     'task': task_name,
@@ -155,16 +156,16 @@ def load_task(path):
         # 继承 CeleryTask 类写法的异步任务类
         for _name, _task_cls in inspect.getmembers(_cls, task_classes):
             task_name = _task_cls.name
-            logger.debug('Loading Task (CLS): %s', _name)
+            logger.info('Loading Task (CLS): %s %s', _name, task_name)
             _task = _task_cls()
-            current_app.register_task(_task)
+            app.register_task(_task)
             if hasattr(_task_cls, 'schedule') and getattr(_task_cls, 'schedule', None):
                 BEAT_SCHEDULE[task_name] = {
                     'task': task_name,
                     'schedule': getattr(_task_cls, 'schedule', None)
                 }
                 delattr(_task_cls, 'schedule')  # 去掉 schedule 属性，避免重复执行
-    current_app.conf.beat_schedule = BEAT_SCHEDULE
+    app.conf.beat_schedule = BEAT_SCHEDULE
     logger.info(f'BEAT_SCHEDULE:{BEAT_SCHEDULE}')
 
 

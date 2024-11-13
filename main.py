@@ -8,7 +8,7 @@ from adam.flask_app import Adam
 logger = logging.getLogger(__name__)
 
 app = Adam(
-    static_folder=os.path.join(settings.CURRENT_DIR, 'static/'),
+    static_folder=os.path.join(settings.CURRENT_DIR, 'dist/'),
     enable_celery=True,
 )
 

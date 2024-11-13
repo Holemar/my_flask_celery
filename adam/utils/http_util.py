@@ -158,13 +158,13 @@ def change_send_data(url, method, data, send_json=False):
         data = None
     # 请求参数
     elif send_json:
-        if data and not isinstance(data, (bytes, str)):
+        if data is not None and not isinstance(data, (bytes, str)):
             data = json.dumps(data)
     elif data and isinstance(data, dict):
         data = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))) for k, v in
                 data.items()}
         data = parse.urlencode(data)
-    if data and isinstance(data, str):
+    if data is not None and isinstance(data, str):
         data = bytes(data, 'utf8')
     return url, data
 
