@@ -38,21 +38,19 @@ class TokenBackend(BasicBackend):
         # 初始化
         request.jwt = None
         request.user = None
-        request.company = None
         request.session = None
-        request.language = request.headers.get('language')  # 语言值，如: chinese
-        request.timezone_value = int(request.headers.get('timezone') or 0)  # 时区值，如: 8
-        request.timezone = request.headers.get('timezonestr') or config.TIME_ZONE  # 时区字符串，如: Asia/Shanghai
 
         if credential:
             try:
                 session_model = app.models['Session']
                 user_mode = app.models['User']
-                company_mode = app.models['Company']
 
                 # magic admin key
                 if _env in ('development', 'dev') and credential == 'XXX':
-                    request.user = user_mode.objects.first()
+                    user = request.user = user_mode.objects.first()
+                    request.session = session_model.objects(user=user).order_by('-id').first()
+                    if not request.session:
+                        request.session = session_model.generate(user, user_type=user.user_type)
                 else:
                     session_object = session_model.objects(token=credential).first()
                     if session_object:
@@ -64,16 +62,6 @@ class TokenBackend(BasicBackend):
                         request.session = session_object
                         user = user_mode.objects(id=session_object.user.id).first()
                         request.user = user
-                        if not request.language and hasattr(user, 'language'):
-                            request.language = user.language.value
-                        if user and user.company:
-                            company = company_mode.objects(id=user.company.id).first()
-                            if company:
-                                if company.is_delete:
-                                    BaseError.unauthorized('company does not exists')
-                                elif company.has_expired():
-                                    BaseError.unauthorized('company has expired')
-                            request.company = company
                     # else:
                     #     BaseError.unauthorized('token does not exists')
             except (jwt.DecodeError, jwt.ExpiredSignatureError) as ex:

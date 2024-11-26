@@ -14,8 +14,10 @@ def return_data(code=None, message=None, data=None):
     """
     响应数据
     """
+    code = code or SUCCESS_CODE
     result = {
-        'code': code or SUCCESS_CODE,
+        'code': code,
+        'success': code == SUCCESS_CODE,
         'message': message or SUCCESS_MESSAGE,
     }
     if data is not None:

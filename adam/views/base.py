@@ -447,13 +447,38 @@ class ResourceView(object):
         # build items
         return return_data(data={'items': items, 'meta': {'total': count}})
 
+    def get_page_data(self, queryset):
+        """
+        获取分页数据
+        """
+        page_size = request.req.page_size  # 每页显示多少行
+        page = request.req.page  # 第几页
+        sort = request.req.sort  # 排序方式
+
+        count = queryset.count()  # 总数
+        # 页码防呆
+        max_page = int((count + page_size - 1) // page_size)  # 最大页码
+        page = max_page if page > max_page else page
+        page = 1 if page < 1 else page
+        skip = (page - 1) * page_size
+        # 取数据
+        items = queryset.order_by(*sort).limit(page_size).skip(skip)
+        items = items if isinstance(items, list) else list(items)
+        # build items
+        return return_data(data={'items': items, 'meta': {
+            'page': page,
+            'page_size': page_size,
+            'max_page': max_page,
+            'total': count
+        }})
+
     def collection_read(self):
         """
         collection endpoint GET
         """
         all_conditions = []
-        limit = int(request.req.max_results or 25)  # 每页显示多少行
-        page = int(request.req.page or 1)  # 第几页
+        page_size = request.req.page_size  # 每页显示多少行
+        page = request.req.page  # 第几页
         sort = request.req.sort
         only_fields = request.req.only
         included_fields = request.req.included or []
@@ -502,12 +527,12 @@ class ResourceView(object):
 
         count = queryset.filter(req_query).count()  # 总数
         # 页码防呆
-        max_page = int((count + limit - 1) // limit)  # 最大页码
+        max_page = int((count + page_size - 1) // page_size)  # 最大页码
         page = max_page if page > max_page else page
         page = 1 if page < 1 else page
-        skip = (page - 1) * limit
+        skip = (page - 1) * page_size
         # 取数据
-        items = queryset.filter(req_query).exclude(*exclude_fields).order_by(*sort).limit(limit).skip(skip)
+        items = queryset.filter(req_query).exclude(*exclude_fields).order_by(*sort).limit(page_size).skip(skip)
 
         # items = list(items)
         items = items if isinstance(items, list) else list(items)
@@ -516,7 +541,8 @@ class ResourceView(object):
         # build items
         return return_data(data={'items': items, 'meta': {
             'page': page,
-            'max_results': limit,
+            'page_size': page_size,
+            'max_page': max_page,
             'total': count
         }})
 
@@ -736,7 +762,7 @@ class ResourceView(object):
         """
         item relations GET
         """
-        limit = int(request.req.max_results or 25)  # 每页显示多少行
+        limit = int(request.req.page_size or 25)  # 每页显示多少行
         page = int(request.req.page or 1)  # 第几页
         sort = request.req.sort
 
@@ -756,7 +782,7 @@ class ResourceView(object):
             items = queryset.order_by(*sort).limit(limit).skip(skip)
             return return_data(data={'items': list(items), 'meta': {
                 'page': page,
-                'max_results': limit,
+                'page_size': limit,
                 'total': count
             }})
         return return_data(code=400, message='Not a valid relation')

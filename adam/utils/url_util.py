@@ -80,9 +80,9 @@ class ParsedRequest(object):
     # `page` value of the query string (?page). Defaults to 1.
     page = 1
 
-    # `max_result` value of the query string (?max_results). Defaults to
+    # `page_size` value of the query string (?page_size). Defaults to
     # `PAGINATION_DEFAULT` unless pagination is disabled.
-    max_results = 0
+    page_size = 0
 
     # `If-Modified-Since` request header value. Defaults to None.
     if_modified_since = None
@@ -166,22 +166,26 @@ def parse_request(document):
 
     :param resource: the resource currently being accessed by the client.
     """
+    try:
+        data = request.get_json()
+    except:
+        data = {}
     args = request.args
     headers = request.headers
     r = ParsedRequest()
-    r.projection = _safe_get(args, 'projection')
-    r.sort = args.get('sort') or '-_id'
+    r.projection = data.get('projection') or _safe_get(args, 'projection')
+    r.sort = data.get('sort') or args.get('sort') or '-id'
     if ',' in r.sort:
         r.sort = r.sort.split(',')
     else:
         r.sort = [r.sort]
-    r.embedded = _safe_get(args, 'embedded')
-    r.included = _safe_get(args, 'included')
-    r.only = _safe_get(args, 'only')
-    r.q = args.get('q')
-    r.by = args.get('by')
+    r.embedded = data.get('embedded') or _safe_get(args, 'embedded')
+    r.included = data.get('included') or _safe_get(args, 'included')
+    r.only = data.get('only') or _safe_get(args, 'only')
+    r.q = data.get('q') or args.get('q')
+    r.by = data.get('by') or args.get('by')
     r.is_debug = headers.get('Debug') == 'on'
-    where = _safe_get(args, 'where') or {}
+    where = data.get('where') or _safe_get(args, 'where') or {}
     if document:
         transformed_where = {}
         fields = document.get_fields()
@@ -201,20 +205,19 @@ def parse_request(document):
                 transformed_where[k] = v
         r.where = transformed_where
 
-    max_results_default = config.PAGINATION_DEFAULT
     try:
-        r.max_results = int(float(args[config.QUERY_MAX_RESULTS]))
-        assert r.max_results > 0
+        r.page_size = int(float(data.get(config.QUERY_PAGE_SIZE) or args[config.QUERY_PAGE_SIZE]))
+        assert r.page_size > 0
     except (ValueError, BadRequestKeyError, AssertionError):
-        r.max_results = max_results_default
+        r.page_size = config.PAGINATION_DEFAULT
+    if r.page_size > config.PAGINATION_LIMIT:
+        r.page_size = config.PAGINATION_LIMIT
 
-    if config.QUERY_PAGE in args:
+    if config.QUERY_PAGE in data or config.QUERY_PAGE in args:
         try:
-            r.page = abs(int(args.get(config.QUERY_PAGE))) or 1
+            r.page = abs(int(data.get(config.QUERY_PAGE) or args.get(config.QUERY_PAGE))) or 1
         except ValueError:
-            pass
-    if r.max_results > config.PAGINATION_LIMIT:
-        r.max_results = config.PAGINATION_LIMIT
+            r.page = 1
 
     if headers:
         r.if_modified_since = weak_date(headers.get('If-Modified-Since'))

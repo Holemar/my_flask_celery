@@ -32,3 +32,4 @@ class BaseError(object, metaclass=CodeType):
     no_project = (602, '获取不到该用户的Project！')
     user_deleted = (603, '该用户已经被删除！')
     project_duplicate = (604, '该项目已经存在！')
+    no_company = (605, '获取不到该用户的企业！')

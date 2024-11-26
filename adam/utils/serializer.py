@@ -249,8 +249,10 @@ def mongo_to_dict(obj, index_only=False, exclude_fields=[], only_fields=[], date
                         return_data.append((field_name, data.isoformat()))
                 else:
                     return_data.append((field_name, data))
-            elif isinstance(_field_val, (ReferenceField, ObjectIdField)):
+            elif isinstance(_field_val, ObjectIdField):
                 return_data.append((field_name, str(data)))
+            elif isinstance(_field_val, ReferenceField):
+                return_data.append((field_name, str(data.id)))
             elif isinstance(_field_val, LazyReferenceField):
                 # ugly fix
                 if isinstance(data, ObjectId):

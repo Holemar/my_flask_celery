@@ -33,7 +33,9 @@ from .middlewares import Middleware
 
 
 logger = logging.getLogger(__name__)
-current_app = None
+current_app = None  # 当前应用的 flask 实例
+socketio = None  # 当前应用的 SocketIO 实例
+
 COUNTER = multiprocessing.Value(ctypes.c_int, 0)  # wsgi子进程计数器
 LOCK = multiprocessing.Lock()
 
@@ -47,12 +49,12 @@ class Adam(Flask):
 
     def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks', model_path='models',
                  enable_celery=False, static_folder='static', template_folder='templates', view_path='views',
-                 url_converters=None, middleware_path='adam/middlewares', **kwargs):
+                 url_converters=None, middleware_path='adam/middlewares', web_socket=False, **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
         we need to enhance our super-class a little bit.
         """
-        global current_app
+        global current_app, socketio
         logging.getLogger('werkzeug').addFilter(WerkzeugLogFilter())
 
         logger.info('Init Adam')
@@ -105,11 +107,15 @@ class Adam(Flask):
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
             celery_util.load_task(task_path, self.celery)  # 加载 tasks 目录下的任务
 
+        # 使用 web socket
+        if web_socket:
+            from flask_socketio import SocketIO
+            socketio = SocketIO(self, cors_allowed_origins=config_util.config.X_DOMAINS, async_mode='gevent')
         current_app = self
 
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
-        parser.add_argument('-m', '--mode', choices=['route', 'api', 'gevent', 'web', 'worker', 'beat', 'monitor', 'shell'])
+        parser.add_argument('-m', '--mode', choices=['route', 'api', 'web', 'websocket', 'worker', 'beat', 'monitor', 'shell'])
         parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
@@ -128,7 +134,7 @@ class Adam(Flask):
         self.port = int(os.environ.get('PORT') or '8000')
         if args.port:  # 端口号，优先级： 启动参数 -> 环境变量 -> 默认值
             self.port = int(args.port)
-        if args.mode in ('route', 'api', 'gevent', 'web'):
+        if args.mode in ('route', 'api', 'websocket', 'web'):
             self.debug = debug
             self.load_route()  # 加载middleware、view
         celery_argv = ['celery'] if celery.__version__ < '5.2.0' else []
@@ -141,13 +147,10 @@ class Adam(Flask):
         elif args.mode == 'api':
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
             super().run(host=self.host, threaded=(not single_thread), port=self.port, debug=debug, **options)
-        elif args.mode == 'gevent':  # 启动gevent服务器，效果跟 flask api 一样
-            from gevent import monkey, pywsgi
-            monkey.patch_all()
-            from werkzeug.debug import DebuggedApplication
-            dapp = DebuggedApplication(self, evalex=True)
-            server = pywsgi.WSGIServer((self.host, self.port), dapp)
-            server.serve_forever()
+        elif args.mode == 'websocket':  # 启动 websocket 服务器，效果跟 flask api 一样
+            global current_app, socketio
+            logger.info(f'Start websocket server  {self.host}:{self.port}')
+            socketio.run(current_app, host=self.host, port=self.port)
         elif args.mode == 'web':  # 启动gunicorn服务器，也可以改成直接 gunicorn 启动
             import gunicorn
             from gunicorn.app.wsgiapp import run

@@ -36,7 +36,7 @@ class BasicBackend(object):
         :param resource: resource being requested.
         :param method: HTTP method being executed (POST, GET, etc.)
         """
-        raise NotImplementedError
+        return True
 
     def render_error_wrong_credential(self):
         """ Returns a standard a 401 response that enables basic auth.
