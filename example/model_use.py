@@ -10,8 +10,8 @@ sys.path.insert(1, '..')
 
 from mongoengine.queryset.visitor import Q
 from adam.flask_app import Adam
-from models.user import User
-from models.enums import UserEnum
+from apps.models.user import User
+from apps.models.enums import UserEnum
 app = Adam(enable_celery=True)
 
 

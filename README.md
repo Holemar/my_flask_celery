@@ -51,14 +51,15 @@ pip install -r requirements.txt
 
 # 代码结构
 |- adam  这目录只放与框架相关的基类、工具类等，不涉及具体业务  
+|- apps  应用目录，放置应用相关的代码  
+|- apps/models  所有的数据库 model 都放这里  
+|- apps/tasks  异步任务  
+|- apps/views  后端接口  
+|- apps/services 业务操作  
+|- apps/utils  业务相关的工具类  
 |- example  这目录是 范例 代码，供学习和记录  
 |- logs  日志记录  
-|- models  所有的数据库 model 都放这里  
 |- script  临时脚本，升级、数据修改等操作  
-|- services 业务操作  
 |- dist   静态资源文件，前端代码发布的地方  
-|- tasks  异步任务  
 |- tests  单元测试  
-|- utils  业务相关的工具类  
-|- views  后端接口  
 |

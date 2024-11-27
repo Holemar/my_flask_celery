@@ -10,7 +10,7 @@ from flask import current_app as app, request
 
 from adam.documents import BaseError
 from adam.views import ResourceView, Blueprint
-from models.enums import UserEnum
+from apps.models.enums import UserEnum
 
 bp = Blueprint(__name__)
 LOGGER = logging.getLogger(__name__)

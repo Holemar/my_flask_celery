@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 app = Adam(
     static_folder=os.path.join(settings.CURRENT_DIR, 'dist/'),
+    task_path='apps.tasks', model_path='apps.models', view_path='apps.views',
     enable_celery=True,
 )
 
