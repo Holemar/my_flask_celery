@@ -260,6 +260,8 @@ def get_pending_msg():
     total_msg = 0  # 总任务数
     queues = config.ALL_QUEUES
     messages = {key: 0 for key in queues}  # 各队列的任务数
+    if not app.celery:
+        return total_msg, messages
     for key in queues:
         try:
             channel = app.celery.connection().channel()

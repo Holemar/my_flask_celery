@@ -106,6 +106,8 @@ class Adam(Flask):
             self.celery = celery.Celery(self.name)
             self.celery.config_from_object(self.config.get('CELERY_CONFIG'))
             celery_util.load_task(task_path, self.celery)  # 加载 tasks 目录下的任务
+        else:
+            self.celery = None
 
         # 使用 web socket
         if web_socket:
@@ -250,12 +252,10 @@ class Adam(Flask):
         load all view
         """
         # Load native views
-        all_view_modules = list()
-        if os.path.exists(path):
-            package_name = path.replace('/', '.').replace(os.sep, '.')
-            package = importlib.import_module(package_name)
-            customize_view_modules = import_submodules(package)
-            all_view_modules = list(customize_view_modules.values())
+        package_name = path.replace('/', '.').replace(os.sep, '.')
+        package = importlib.import_module(package_name)
+        customize_view_modules = import_submodules(package)
+        all_view_modules = list(customize_view_modules.values())
 
         lookup_view = lambda x: (inspect.isclass(x) and x != ResourceView
                                  and not getattr(x, "_meta", {}).get('abstract') and issubclass(x, ResourceView))
@@ -271,13 +271,16 @@ class Adam(Flask):
             name = views[0][0]
             resource = name
             cls_view = views[0][1]
-            acl = cls_view.acl
+            acl = cls_view.acl.copy()
             routes = {}
             bp = inspect.getmembers(module, lookup_bp)
             bp_obj = bp[0][1] if bp else None
             if bp:
                 routes.update(bp_obj.routes)
                 acl.extend(bp_obj.acl)
+                bp_name = bp_obj.name
+                if bp_name and bp_name.startswith(package_name):
+                    resource = bp_name[len(package_name) + 1:]
 
             # check alias
             cls_parent = cls_view.__bases__[0]
@@ -293,9 +296,9 @@ class Adam(Flask):
                         'remote_item': {**routes['remote_item'], **bp_obj.routes['remote_item']}
                     }
 
-            model = self.models.get(resource)
+            model = self.models.get(resource) or self.models.get(name)
             view = cls_view(app=self, model=model, routes=routes)
-            cls_view.acl = acl
+            view.acl = acl
             self.views[resource] = view
 
         for name, view in self.views.items():

@@ -17,7 +17,7 @@ def index():
     return current_app.send_static_file('index.html')
 
 
-@current_app.route('/api/status')
+@current_app.route(f'/{config.URL_PREFIX}/status')
 def status():
     """用于查看程序运行状态。任务堆积情况等"""
     start_time = time.time()

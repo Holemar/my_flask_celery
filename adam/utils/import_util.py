@@ -90,6 +90,13 @@ def load_modules(path, func_lookup=None):
 
     for _k, _m in all_modules:
         models[_k] = _m
+        _n = str(_m)[8:-2]
+        if _n.startswith(path + '.'):
+            _n = _n[len(path) + 1:]
+        if _n.endswith('.' + _k):
+            _n = _n[:-len(_k) - 1]
+        if _n:
+            models[_n] = _m
     return models
 
 
