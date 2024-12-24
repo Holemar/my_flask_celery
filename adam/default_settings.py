@@ -1,10 +1,18 @@
 # -*- coding: utf-8 -*-
 
 import os
+import time
+import socket
 
 # debug=true 时，log 会变成 debug 级别(默认 info 级别)
 DEBUG = os.environ.get('DEBUG', '').lower() in ('true', '1')
 ENV = os.environ.get('ENV') or 'development'  # production, development, test
+
+# 默认时区设置
+TIME_ZONE = os.environ.get('TZ') or os.environ.get('TIME_ZONE') or 'Etc/GMT'  # 'Asia/Shanghai'
+os.environ['TZ'] = TIME_ZONE
+if hasattr(time, 'tzset'):
+    time.tzset()  # Python time tzset() 根据环境变量TZ重新初始化时间相关设置。
 
 # ISO 8601
 DATE_FORMAT = '%Y-%m-%dT%H:%M:%S'
@@ -193,7 +201,6 @@ AUTHENTICATION_BACKENDS = [
     'adam.auth.token_backend'
 ]
 
-TIME_ZONE = os.environ.get('TIME_ZONE', 'Asia/Shanghai')  # 时区
 
 BROKER_MODE = os.environ.get('BROKER_MODE') or 'mongodb'
 # MASTER_NAME = 'mymaster'
@@ -236,8 +243,18 @@ class CELERY_CONFIG(object):
 # celery 监控账号密码
 MONITOR_USERNAME = os.environ.get('MONITOR_USERNAME', 'admin')
 MONITOR_PASSWORD = os.environ.get('MONITOR_PASSWORD', '123456')
-# celery 任务数量限制,超过则认为任务堆积过多
-LIMIT_TASK = int(os.environ.get('LIMIT_TASK') or 1000)
+
+# celery 限制
+RETRY_TASK_DAYS = int(os.environ.get('RETRY_TASK_DAYS') or 10)  # 允许重试的任务天数(超过的不再重试)
+LIMIT_TASK = int(os.environ.get('LIMIT_TASK') or 1000)  # 任务数量限制,超过则认为任务堆积过多
+TASK_TLE = int(os.environ.get('TASK_TLE') or 60)  # 任务超时时间(分钟)，超过则认为任务需要重试
+TASK_ERROR_TIMES = int(os.environ.get('TASK_ERROR_TIMES') or 15)  # 任务出错重试次数限制
+
 
 # Database
 MONGO_CONNECTIONS = {}
+
+
+# HTTP 的超时时间
+SOCKET_TIMEOUT = int(os.environ.get('SOCKET_TIMEOUT') or 30)
+socket.setdefaulttimeout(SOCKET_TIMEOUT)

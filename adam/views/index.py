@@ -1,15 +1,16 @@
 # -*- coding:utf-8 -*-
 import os
-import sys
 import time
 import logging
+
 from flask import jsonify, request, current_app
 from .blueprint import return_data
 from ..utils.config_util import config
 from ..utils.json_util import json_serializable
 from ..utils.celery_util import get_pending_msg, get_beat, get_workers, get_beat_schedule
 
-logger = logging.getLogger(__name__)
+LOGGER = logging.getLogger(__name__)
+PUBLISH_TIME = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())  # 发布时间
 
 
 @current_app.route('/')
@@ -25,6 +26,7 @@ def status():
     try:
         # 版本更新时间
         message['update_time'] = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
+        message['publish_time'] = PUBLISH_TIME  # 发布时间
         message['now'] = time.strftime('%Y-%m-%d %H:%M:%S')  # 系统时间,用来核对系统时间是否正确
         # message['argv'] = sys.argv  # 系统启动参数
         # 任务队列情况
@@ -54,7 +56,7 @@ def status():
 
         message['duration'] = time.time() - start_time  # 本接口查询耗时
     except Exception as e:
-        logger.exception("Get status raise error {}".format(str(e)))
+        LOGGER.exception("Get status raise error {}".format(str(e)))
         message['error'] = str(e)
     finally:
         return jsonify(message)

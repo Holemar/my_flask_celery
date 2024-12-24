@@ -15,10 +15,10 @@ from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
 from flask import request
 from ..utils.serializer import mongo_to_dict
+from .base import IDocument
+
 
 logger = logging.getLogger(__name__)
-
-from .base import IDocument
 
 
 class MyQuerySet(QuerySetNoCache):
@@ -130,6 +130,33 @@ class ResourceDocument(Document, IDocument):
         """
         pass
 
+    def es_insert(self):
+        """
+        存储到 es 中
+        """
+        from ..utils.es_model_util import EsModelUtil  # 这里导入，为了不强求安装 es 依赖，需要用到再安装
+        conn = EsModelUtil(self)
+        conn.insert(self)
+
+    def es_update(self):
+        """
+        存储到 es 中
+        """
+        from ..utils.es_model_util import EsModelUtil  # 这里导入，为了不强求安装 es 依赖，需要用到再安装
+        conn = EsModelUtil(self)
+        conn.update(self.id, self)
+
+    def es_save(self):
+        """
+        存储到 es 中
+        """
+        from ..utils.es_model_util import EsModelUtil  # 这里导入，为了不强求安装 es 依赖，需要用到再安装
+        conn = EsModelUtil(self)
+        if self.id and conn.get(self.id):
+            conn.update(self.id, self)
+        else:
+            conn.insert(self)
+
     def delete(self, enable_hook=True, *args, **kwargs):
         """
         重载delete
@@ -137,7 +164,7 @@ class ResourceDocument(Document, IDocument):
         result = super().delete(*args, **kwargs)
         return result
 
-    def save(self, enable_hook=True, *args, **kwargs):
+    def save(self, enable_hook=True, es=False, *args, **kwargs):
         """
         重载save，自动更新时间戳
             param: args
@@ -152,8 +179,13 @@ class ResourceDocument(Document, IDocument):
         result = super().save(*args, **kwargs)
         if enable_hook and mode == 'create':
             self.after_create(result)
-        if enable_hook and mode == 'update':
+        elif enable_hook and mode == 'update':
             self.after_update(kwargs)
+        if es:
+            if mode == 'create':
+                self.es_insert()
+            elif mode == 'update':
+                self.es_update()
         return result
 
     def update(self, enable_hook=True, **kwargs):
@@ -199,7 +231,7 @@ class ResourceDocument(Document, IDocument):
     def find_one_by_id(cls, id):
         item_condition = {'id': id}
         return cls.objects.get(**item_condition)
-    
+
     @classmethod
     def find_by_ids(cls, ids):
         return list(cls.objects(id__in=ids).all())

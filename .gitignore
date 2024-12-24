@@ -6,7 +6,6 @@ __pycache__/
 
 # files
 *.csv
-*.txt
 *.pdf
 *.doc
 ~$*.docx

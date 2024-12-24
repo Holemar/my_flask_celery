@@ -12,7 +12,7 @@ from urllib import request, parse
 from .str_util import gzip_decode, zlib_decode, decode2str
 
 
-__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params')
+__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params', 'sse_response')
 
 
 context = ssl._create_unverified_context()
@@ -293,3 +293,25 @@ def get_request_params(url):
         result[key] = parse.unquote(value)  # 值需要转码
 
     return result
+
+
+def sse_response(event_name, data, index):
+    """
+    处理sse响应
+    :param event_name: sse事件名称
+    :param data: sse数据
+    :param index: sse数据索引
+    :return: sse响应
+    """
+    if index is None:
+        i = 0
+    else:
+        i = index[0]
+        index[0] += 1
+    if isinstance(data, (tuple, set)):
+        data = list(data)
+    if isinstance(data, (dict, list)):
+        data = json.dumps(data, ensure_ascii=False)
+    sse_data = f'id: {i}\nevent: {event_name}\ndata: {data}\n\n'
+    return sse_data
+

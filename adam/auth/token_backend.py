@@ -7,7 +7,7 @@ import jwt
 from flask import request, current_app as app, abort
 
 from .basic_backend import BasicBackend
-from ..documents import BaseError
+from ..exceptions import BaseError
 from ..utils.config_util import config
 
 logger = logging.getLogger(__name__)
@@ -20,8 +20,8 @@ class TokenBackend(BasicBackend):
     """
     def get_credential(self):
         credential = None
-        secret = app.config.get('JWT_SECRET')
-        jwt_alg = app.config.get('JWT_ALG') or 'HS256'
+        secret = config.JWT_SECRET
+        jwt_alg = config.JWT_ALG or 'HS256'
         if not secret or not jwt_alg:
             BaseError.system_error('Server error, missing secret')
 
@@ -48,9 +48,10 @@ class TokenBackend(BasicBackend):
                 # magic admin key
                 if _env in ('development', 'dev') and credential == 'XXX':
                     user = request.user = user_mode.objects.first()
-                    request.session = session_model.objects(user=user).order_by('-id').first()
-                    if not request.session:
-                        request.session = session_model.generate(user, user_type=user.user_type)
+                    if user:
+                        request.session = session_model.objects(user=user).order_by('-id').first()
+                        if not request.session:
+                            request.session = session_model.generate(user)
                 else:
                     session_object = session_model.objects(token=credential).first()
                     if session_object:

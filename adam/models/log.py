@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import os
 import sys
 import uuid
 import types
@@ -28,6 +29,10 @@ LogRecordFields = ('name', 'levelno', 'pathname', 'module', 'funcName', 'lineno'
                    'exc_info', 'exc_text', 'stack_info', 'levelname', 'filename', 'process', "thread",)
 # 内置变量
 Built_in = ('<class ', '<built-in ', '<function ', '<bound method ')
+
+
+# 相同错误类型的日志是否只记录一次
+SINGLE_LOG = os.environ.get('SINGLE_LOG', 'true').lower() in ('true', '1')
 
 
 def get_locals(pathname):
@@ -128,6 +133,7 @@ class Log(ResourceDocument):
     name = StringField()  # logger 名称
     level = IntField()  # 日志级别，跟 logging 的级别一样的数值
     message = StringField()  # 日志内容
+    count = IntField(default=1)  # 出现次数
 
     file_path = StringField()  # 写日志的代码所在文件的路径
     module = StringField()  # 写日志的代码所在的 module
@@ -151,7 +157,14 @@ class Log(ResourceDocument):
             # 过滤 bad request 请求日志
             if record.name == "werkzeug" and record.module == "_internal" and record.funcName == "_log":
                 return
-            obj = cls()
+            obj = None
+            if SINGLE_LOG:
+                # 相同错误类型只记录一次
+                obj = cls.objects(file_path=record.pathname, line_no=record.lineno).first()
+            if not obj:
+                obj = cls()
+            else:
+                obj.count += 1
             obj.name = record.name
             obj.level = record.levelno
             obj.file_path = record.pathname
@@ -177,8 +190,9 @@ class Log(ResourceDocument):
                 f_locals.update(extra)
                 obj.f_locals = f_locals
             obj.stack_info = str(record.stack_info) if record.stack_info else None
-            obj.created_at = datetime.datetime.fromtimestamp(record.created)
-            obj.save(force_insert=True)
+            # obj.created_at = datetime.datetime.fromtimestamp(record.created)
+            # obj.save(force_insert=True)
+            obj.save()
         # 避免写日志的错误影响其它代码
         except Exception as e:
             print('数据库日志记录异常:', e)

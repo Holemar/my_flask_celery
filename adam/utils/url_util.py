@@ -175,10 +175,11 @@ def parse_request(document):
     r = ParsedRequest()
     r.projection = data.get('projection') or _safe_get(args, 'projection')
     r.sort = data.get('sort') or args.get('sort') or '-id'
-    if ',' in r.sort:
-        r.sort = r.sort.split(',')
-    else:
-        r.sort = [r.sort]
+    if isinstance(r.sort, str):
+        if ',' in r.sort:
+            r.sort = r.sort.split(',')
+        else:
+            r.sort = [r.sort]
     r.embedded = data.get('embedded') or _safe_get(args, 'embedded')
     r.included = data.get('included') or _safe_get(args, 'included')
     r.only = data.get('only') or _safe_get(args, 'only')

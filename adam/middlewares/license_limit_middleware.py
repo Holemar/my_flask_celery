@@ -8,7 +8,7 @@ from flask import request
 from datetime import datetime
 from flask import current_app as app
 from .base import Middleware
-from ..documents import BaseError
+from ..exceptions import BaseError
 
 
 class LicenseLimitMiddleware(Middleware):

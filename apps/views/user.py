@@ -8,7 +8,7 @@ import logging
 from mongoengine.queryset.visitor import Q
 from flask import current_app as app, request
 
-from adam.documents import BaseError
+from adam.exceptions import BaseError
 from adam.views import ResourceView, Blueprint
 from apps.models.enums import UserEnum
 

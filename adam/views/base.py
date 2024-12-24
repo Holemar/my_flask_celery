@@ -25,7 +25,7 @@ from mongoengine.queryset.visitor import Q
 from mongoengine.fields import LazyReferenceField, ReferenceField
 from werkzeug.exceptions import NotFound, Unauthorized, BadRequest, HTTPException
 
-from ..documents import CommonException, BussinessCommonException, BaseError
+from ..exceptions import CommonException, BussinessCommonException, BaseError
 from ..utils.serializer import serialize, dict_to_mongo, mongo_to_dict
 from ..utils.url_util import parse_request, payload, get_param
 from ..fields import RelationField
@@ -481,7 +481,7 @@ class ResourceView(object):
         page = request.req.page  # 第几页
         sort = request.req.sort
         only_fields = request.req.only
-        included_fields = request.req.included or []
+        included_fields = request.req.included or []  # 关联查询的字段
         q = request.req.q
 
         # meta-hidden

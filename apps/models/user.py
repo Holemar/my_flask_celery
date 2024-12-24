@@ -1,6 +1,7 @@
 # -*- coding:utf-8 -*-
 
-from adam.documents import ResourceDocument, BaseError
+from adam.exceptions import BaseError
+from adam.documents import ResourceDocument
 from adam.fields import (StringField, EmailField, PasswordField, EnumField, BooleanField, LazyReferenceField,
                          RelationField, DictField)
 from .enums import UserEnum, Language

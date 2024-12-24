@@ -49,7 +49,7 @@ class Adam(Flask):
 
     def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks', model_path='models',
                  enable_celery=False, static_folder='static', template_folder='templates', view_path='views',
-                 url_converters=None, middleware_path='adam/middlewares', web_socket=False, **kwargs):
+                 url_converters=None, middleware_path='adam/middlewares', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
         we need to enhance our super-class a little bit.
@@ -109,10 +109,13 @@ class Adam(Flask):
         else:
             self.celery = None
 
-        # 使用 web socket
-        if web_socket:
+        if 'websocket' in sys.argv:
+            from gevent import monkey
             from flask_socketio import SocketIO
-            socketio = SocketIO(self, cors_allowed_origins=config_util.config.X_DOMAINS, async_mode='gevent')
+            monkey.patch_all()  # socketio要想与flask通信必须打补丁
+            socketio = SocketIO(self, cors_allowed_origins=config_util.config.X_DOMAINS, async_mode='gevent',
+                                message_queue=config_util.config.REDIS_URL)
+
         current_app = self
 
     def run(self, debug=None, **options):
@@ -150,9 +153,8 @@ class Adam(Flask):
             single_thread = True if os.environ.get('SINGLE_THREAD') else False
             super().run(host=self.host, threaded=(not single_thread), port=self.port, debug=debug, **options)
         elif args.mode == 'websocket':  # 启动 websocket 服务器，效果跟 flask api 一样
-            global current_app, socketio
             logger.info(f'Start websocket server  {self.host}:{self.port}')
-            socketio.run(current_app, host=self.host, port=self.port)
+            socketio.run(self, host=self.host, port=self.port)
         elif args.mode == 'web':  # 启动gunicorn服务器，也可以改成直接 gunicorn 启动
             import gunicorn
             from gunicorn.app.wsgiapp import run

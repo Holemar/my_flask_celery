@@ -5,13 +5,14 @@
 
 | 功能               | 命令                             |
 |------------------|--------------------------------|
-| 启动 api 普通模式      | python3 fc_agent.py -m api     |
-| 启动 api 正式发布模式    | python3 fc_agent.py -m web     |
-| 启动 celery beat   | python3 fc_agent.py -m beat    |
-| 启动 celery worker | python3 fc_agent.py -m worker  |
-| 查看 api 接口        | python3 fc_agent.py -m route   |
-| 进入交互模式           | python3 fc_agent.py -m shell   |
-| 查看 celery 管理后台   | python3 fc_agent.py -m monitor |
+| 启动 api 普通模式      | python3 main.py -m api     |
+| 启动 api 正式发布模式    | python3 main.py -m web     |
+| 启动 websocket    | python3 overseas.py -m websocket  |
+| 启动 celery beat   | python3 main.py -m beat    |
+| 启动 celery worker | python3 main.py -m worker  |
+| 查看 api 接口        | python3 main.py -m route   |
+| 进入交互模式           | python3 main.py -m shell   |
+| 查看 celery 管理后台   | python3 main.py -m monitor |
 
 
 # 项目说明
@@ -41,7 +42,7 @@ pip install -r requirements.txt
 
 # celery 任务开发说明
 - 支持定时任务和异步任务
-- 异步任务/定时任务，写到目录 `tasks` 下，会加载到 celery 任务队列中
+- 异步任务/定时任务，写到目录 `apps/tasks` 下，会加载到 celery 任务队列中
 - 抽离了定时任务的配置，写到异步任务所在的文件中，定义 SCHEDULE 变量中即可自动加载
 - 支持继承 Task 的任务，也支持 celery.task 装饰器的任务
 - 定义 BaseTask 基类，作为所有 celery.task 装饰器的任务的 base，可修改任务执行前后的多个事件
@@ -50,16 +51,22 @@ pip install -r requirements.txt
 
 
 # 代码结构
-|- adam  这目录只放与框架相关的基类、工具类等，不涉及具体业务  
-|- apps  应用目录，放置应用相关的代码  
-|- apps/models  所有的数据库 model 都放这里  
-|- apps/tasks  异步任务  
-|- apps/views  后端接口  
-|- apps/services 业务操作  
-|- apps/utils  业务相关的工具类  
-|- example  这目录是 范例 代码，供学习和记录  
-|- logs  日志记录  
-|- script  临时脚本，升级、数据修改等操作  
-|- dist   静态资源文件，前端代码发布的地方  
-|- tests  单元测试  
-|
+├── adam/ # 核心公用库。这目录只放与框架相关的基类、工具类等，不涉及具体业务  
+├── apps/ # 应用目录，放置应用相关的代码  
+│ └── models/ # 所有的数据库 model 都放这里  
+│ └── tasks/ # 异步任务  
+│ └── views/ # 后端接口  
+│ └── services/ # 业务操作  
+│ └── utils/ # 业务相关的工具类  
+├── example/ # 这目录是 范例 代码，供学习和记录  
+├── logs/ # 日志记录  
+├── script/ # 临时脚本，升级、数据修改等操作  
+├── dist/ # 静态资源文件，前端代码发布的地方  
+├── tests/ # 单元测试  
+│ └── adam/ # 核心公用库的工具类测试  
+│ └── apis/ # 外部接口测试  
+│ └── views/ # 本项目后端接口测试  
+├── .gitignore # Git忽略配置
+├── main.py # 主程序入口
+└── requirements.txt # 依赖包
+
