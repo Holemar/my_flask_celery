@@ -51,22 +51,89 @@ pip install -r requirements.txt
 
 
 # 代码结构
-├── adam/ # 核心公用库。这目录只放与框架相关的基类、工具类等，不涉及具体业务  
-├── apps/ # 应用目录，放置应用相关的代码  
-│ └── models/ # 所有的数据库 model 都放这里  
-│ └── tasks/ # 异步任务  
-│ └── views/ # 后端接口  
-│ └── services/ # 业务操作  
-│ └── utils/ # 业务相关的工具类  
-├── example/ # 这目录是 范例 代码，供学习和记录  
-├── logs/ # 日志记录  
-├── script/ # 临时脚本，升级、数据修改等操作  
-├── dist/ # 静态资源文件，前端代码发布的地方  
-├── tests/ # 单元测试  
-│ └── adam/ # 核心公用库的工具类测试  
-│ └── apis/ # 外部接口测试  
-│ └── views/ # 本项目后端接口测试  
-├── .gitignore # Git忽略配置
-├── main.py # 主程序入口
-└── requirements.txt # 依赖包
-
+```markdown
+adam/  
+├── adam/                                   # 主源代码目录  
+│   ├── auth/                               # flask 认证模块，接口访问前的处理  
+│   │   ├── token_backend.py                # Token 认证  
+│   │   ├── basic_backend.py                # 基础认证  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │   
+│   ├── documents/                          # 数据库模型基类  
+│   │   ├── base.py                         # 基础数据库模型接口类   
+│   │   ├── resource_document.py            # 基础数据库模型实现  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── exceptions/                         # 异常定义  
+│   │   ├── error_codes.py                  # 错误码定义  
+│   │   ├── exceptions.py                   # 异常类定义  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── fields/                             # 数据库模型字段定义  
+│   │   ├── enum_field.py                   # 枚举字段  
+│   │   ├── password_field.py               # 密码字段  
+│   │   ├── relation_field.py               # 关系字段  
+│   │   ├── ttl_field.py                    # TTL字段  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── middlewares/                        # flask 中间件  
+│   │   ├── base.py                         # 基础中间件  
+│   │   ├── cors_middleware.py              # CORS中间件  
+│   │   ├── license_limit_middleware.py     # 许可证限制中间件  
+│   │   ├── token_middleware.py             # Token中间件  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │   
+│   ├── models/                             # 公用数据库模型定义  
+│   │   ├── cache_model.py                  # 缓存模型  
+│   │   ├── common.py                       # 通用模型  
+│   │   ├── log.py                          # 错误日志模型  
+│   │   ├── log_api.py                      # API日志模型  
+│   │   ├── work_status.py                  # celery 工作状态模型  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── utils/                              # 工具函数库  
+│   │   ├── bson_util.py                    # BSON工具  
+│   │   ├── celery_util.py                  # Celery工具  
+│   │   ├── config_util.py                  # 配置工具  
+│   │   ├── db_util.py                      # 数据库工具  
+│   │   ├── email_util.py                   # 邮件工具  
+│   │   ├── es_model_util.py                # ES模型工具  
+│   │   ├── es_util.py                      # ES工具  
+│   │   ├── html_util.py                    # HTML工具  
+│   │   ├── http_util.py                    # HTTP工具  
+│   │   ├── import_util.py                  # 导入工具  
+│   │   ├── json_util.py                    # JSON工具  
+│   │   ├── log_filter.py                   # 日志过滤器  
+│   │   ├── rc4.py                          # RC4加密  
+│   │   ├── serializer.py                   # 序列化工具  
+│   │   ├── str_util.py                     # 字符串工具  
+│   │   ├── thread_util.py                  # 线程工具  
+│   │   ├── time_util.py                    # 时间工具  
+│   │   ├── url_util.py                     # URL工具  
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── views/                              # 视图基类  
+│   │   ├── base.py                         # 视图基类，提供统一的增删改查接口及返回格式    
+│   │   ├── blueprint.py                    # 类似于 flask blueprint，提供模块化的视图。但这个配合 base 视图使用    
+│   │   ├── index.py                        # 定义前端入口视图、状态视图、错误视图    
+│   │   └── __init__.py                     # 模块初始化文件  
+│   │  
+│   ├── celery_base_task.py                 # celery 任务基类  
+│   ├── default_settings.py                 # 默认配置  
+│   ├── flask_app.py                        # flask 的扩展，用于启动 Flask 应用  
+│   └── __init__.py                         # 模块初始化文件  
+│  
+├── examples/                               # 范例代码  
+│   ├── bs4_use.py                          # bs4 使用示例  
+│   ├── model.py                            # 数据库模型示例  
+│   ├── task.py                             # 定时任务示例  
+│   ├── view.py                             # 视图示例  
+│   └── __init__.py                         # 模块初始化文件  
+│  
+├── tests/                                  # 测试用例  
+├── main.py                                 # 启动文件范例  
+├── .gitignore                              # Git忽略配置  
+├── readme.md                               # 说明文档  
+├── settings.py                             # 配置文件范例  
+└── requirements.txt                        # 主要依赖文件  
+```

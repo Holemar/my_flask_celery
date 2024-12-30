@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+主要用于 mongodb 数据的序列化
+"""
 import json
 import time
 import uuid

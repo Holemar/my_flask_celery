@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
-
+"""
+提供 json 序列化和反序列化的 bson 编码器和解码器。
+主要用于 celery 任务参数的序列化和反序列化。
+"""
 import uuid
 import json
 import time

@@ -3,7 +3,7 @@
 import logging
 
 from flask import current_app as app, request
-from adam.documents import BaseError
+from adam.exceptions import BaseError
 from adam.views import ResourceView, Blueprint
 
 bp = Blueprint(__name__)
