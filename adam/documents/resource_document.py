@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-继承mongoengine的Document，实现一些基础功能：
-    * 时间戳
+继承mongoengine的Document，实现一些基础功能
 """
-
 import json
 import logging
 from datetime import datetime
@@ -15,7 +13,9 @@ from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
 from ..utils.serializer import mongo_to_dict
 from ..utils.import_util import parse_csv_content
-from .async_document import *
+from .async_document import get_motor_collection, build_document, find_one_async, find_one_and_update_async, find, \
+    find_async, save_async, count_async, update_many_async, delete_many_async, aggregate_async
+
 
 logger = logging.getLogger(__name__)
 
