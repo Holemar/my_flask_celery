@@ -274,7 +274,7 @@ class ResourceView(object):
         if hasattr(request, 'req'):
             included = request.req.included or []
         # 强行封装成统一格式
-        if isinstance(obj, (list, dict)) and 'code' not in obj:
+        if isinstance(obj, (list, dict)) and ('code' not in obj or 'data' not in obj):
             obj = return_data(data=obj)
         elif isinstance(obj, Document):
             obj = return_data(data=obj)
@@ -291,7 +291,7 @@ class ResourceView(object):
 
         res = return_data(code=exception.code, message=exception.message, data=exception.data)
         logger.error(res, exc_info=exception)
-        return Response(json.dumps(res), status=exception.status_code, mimetype='application/json')
+        return Response(json.dumps(res), status=200, mimetype='application/json')
 
     def render_error(self, code, message, ex=None):
         data = None
@@ -447,9 +447,10 @@ class ResourceView(object):
         # build items
         return return_data(data={'items': items, 'meta': {'total': count}})
 
-    def get_page_data(self, queryset):
+    def get_page_data(self, queryset, exclude_fields=[], only_fields=[], date_format=None, without_none=False):
         """
         获取分页数据
+        :param queryset: 查询的 queryset
         """
         page_size = request.req.page_size  # 每页显示多少行
         page = request.req.page  # 第几页
@@ -461,9 +462,17 @@ class ResourceView(object):
         page = max_page if page > max_page else page
         page = 1 if page < 1 else page
         skip = (page - 1) * page_size
+        if exclude_fields:
+            queryset = queryset.exclude(*exclude_fields)
+        if only_fields:
+            queryset = queryset.only(*only_fields)
         # 取数据
         items = queryset.order_by(*sort).limit(page_size).skip(skip)
         items = items if isinstance(items, list) else list(items)
+        if exclude_fields or only_fields or date_format or without_none:
+            items = [mongo_to_dict(item, exclude_fields=exclude_fields, only_fields=only_fields,
+                                   date_format=date_format, without_none=without_none)
+                     for item in items]
         # build items
         return return_data(data={'items': items, 'meta': {
             'page': page,

@@ -84,7 +84,7 @@ def to_string(value=None, format_str=None, default_now=False):
         return time.strftime(this_format, value)
     # string, change type first
     elif isinstance(value, basestring):
-        value = _str_2_datetime(value)
+        value = _str_2_datetime(value, from_format=format_str)
         return value.strftime(this_format)
     # number, treated as a timestamp
     elif isinstance(value, (int, long, float)):

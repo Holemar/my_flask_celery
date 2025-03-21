@@ -7,7 +7,7 @@ from flask import jsonify, request, current_app
 from .blueprint import return_data
 from ..utils.config_util import config
 from ..utils.json_util import json_serializable
-from ..utils.celery_util import get_pending_msg, get_beat, get_workers, get_beat_schedule
+from ..utils.celery_util import get_pending_msg, get_beat, get_workers, get_beat_schedule, delete_repeat_task, clear_tasks
 
 LOGGER = logging.getLogger(__name__)
 PUBLISH_TIME = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())  # 发布时间
@@ -53,6 +53,12 @@ def status():
         # 查看所有的 beat 定时任务配置
         if data.get('beat'):
             message['beat_schedule'] = get_beat_schedule()
+        # 清除重复任务
+        if data.get('delete_repeat_task'):
+            delete_repeat_task()
+        # 清除所有任务
+        if data.get('clear_tasks'):
+            clear_tasks()
 
         message['duration'] = time.time() - start_time  # 本接口查询耗时
     except Exception as e:

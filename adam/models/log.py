@@ -10,12 +10,13 @@ import logging
 import traceback
 from enum import Enum
 
-from flask import request
+from bson import ObjectId
 from mongoengine import Document
 from mongoengine.fields import IntField, StringField, DictField
 
 from ..documents import ResourceDocument
 from ..utils.str_util import decode2str
+from ..utils.config_util import config
 from ..utils.json_util import json_serializable
 
 # 记录各变量时，排除的类型
@@ -31,8 +32,18 @@ LogRecordFields = ('name', 'levelno', 'pathname', 'module', 'funcName', 'lineno'
 Built_in = ('<class ', '<built-in ', '<function ', '<bound method ')
 
 
+# log的保存天数，超过则自动删除
+SAVE_LOG_DAYS = int(os.environ.get('SAVE_LOG_DAYS') or 10)
 # 相同错误类型的日志是否只记录一次
 SINGLE_LOG = os.environ.get('SINGLE_LOG', 'true').lower() in ('true', '1')
+
+
+def delete_log():
+    """删除旧log(删除配置天数之前的)"""
+    dt = datetime.datetime.utcnow() - datetime.timedelta(days=SAVE_LOG_DAYS)
+    _oid = ObjectId.from_datetime(dt)
+    # Log.objects(created_at__lte=dt).delete()
+    Log.objects(id__lte=_oid).delete()
 
 
 def get_locals(pathname):
@@ -105,15 +116,6 @@ def repr_value(value):
     # model 对象，友好显示出来
     elif isinstance(value, Document):
         return 'Document:' + str(value.pk)
-    # request 请求，记录详情
-    elif value is request:
-        try:
-            return dict(method=request.method, url=request.full_path, headers=dict(request.headers),
-                        ip=request.headers.getlist("X-Forwarded-For") or request.remote_addr,
-                        body=decode2str(request.data), endpoint=request.endpoint
-                        )
-        except:
-            return repr(value)
     # LogRecord
     elif isinstance(value, logging.LogRecord):
         _v = {k: getattr(value, k, None) for k in LogRecordFields}
@@ -121,6 +123,16 @@ def repr_value(value):
         return _v
     # 其它类型
     else:
+        try:
+            from flask import request
+            # request 请求，记录详情
+            if value is request:
+                return dict(method=request.method, url=request.full_path, headers=dict(request.headers),
+                            ip=request.headers.getlist("X-Forwarded-For") or request.remote_addr,
+                            body=decode2str(request.data), endpoint=request.endpoint
+                            )
+        except:
+            pass
         return repr(value)
 
 
@@ -154,6 +166,8 @@ class Log(ResourceDocument):
         :param msg: 日志内容
         """
         try:
+            if not config.MONGO_CONNECTIONS:
+                return
             # 过滤 bad request 请求日志
             if record.name == "werkzeug" and record.module == "_internal" and record.funcName == "_log":
                 return

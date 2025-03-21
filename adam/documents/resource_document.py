@@ -13,7 +13,6 @@ from mongoengine.queryset.visitor import Q
 from mongoengine.fields import DateTimeField
 from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
-from flask import request
 from ..utils.serializer import mongo_to_dict
 from .base import IDocument
 
@@ -106,6 +105,7 @@ class ResourceDocument(Document, IDocument):
 
     @classmethod
     def _get_changer(cls):
+        from flask import request
         return request.user
 
     def before_save(self, *args, **kwargs):

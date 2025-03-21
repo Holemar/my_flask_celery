@@ -10,7 +10,9 @@ import datetime
 import logging
 import decimal
 from enum import Enum
+from mongoengine import Document
 from .str_util import decode2str
+from .serializer import mongo_to_dict
 
 # base file path, for found files
 BASE_PATH = os.getcwd()
@@ -105,6 +107,8 @@ def json_serializable(value):
             key1 = json_serializable(key1)
             this_value[key1] = json_serializable(value1)
         return this_value
+    elif isinstance(value, Document):
+        return mongo_to_dict(value)
     else:
         return str(value)
 

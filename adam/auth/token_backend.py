@@ -4,7 +4,7 @@ import os
 import logging
 
 import jwt
-from flask import request, current_app as app, abort
+from flask import request, current_app as app
 
 from .basic_backend import BasicBackend
 from ..exceptions import BaseError

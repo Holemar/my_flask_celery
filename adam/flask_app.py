@@ -48,7 +48,7 @@ class Adam(Flask):
     supported_item_methods = ['GET', 'PATCH', 'DELETE', 'PUT']
 
     def __init__(self, import_name=__package__, root='', settings='settings', task_path='tasks', model_path='models',
-                 enable_celery=False, static_folder='static', template_folder='templates', view_path='views',
+                 enable_celery=False, static_folder=None, template_folder='templates', view_path='views',
                  url_converters=None, middleware_path='adam/middlewares', **kwargs):
         """  main WSGI app is implemented as a Flask subclass. Since we want
         to be able to launch our API by simply invoking Flask's run() method,
@@ -71,6 +71,7 @@ class Adam(Flask):
             middleware_path = root + '/middlewares'
 
         kwargs['template_folder'] = template_folder
+        static_folder = static_folder or os.path.join(os.getcwd(), 'static/')
         kwargs['static_folder'] = static_folder
 
         super().__init__(import_name, **kwargs)
@@ -91,7 +92,8 @@ class Adam(Flask):
             self.url_map.converters.update(url_converters)
 
         # Register mongoengine connections
-        for k, v in self.config.get('MONGO_CONNECTIONS', {}).items():
+        MONGO_CONNECTIONS = self.config.get('MONGO_CONNECTIONS', {})
+        for k, v in MONGO_CONNECTIONS.items():
             register_connection(alias=k, host=v)
 
         self.views = {}
@@ -99,7 +101,8 @@ class Adam(Flask):
         self.middlewares = {}
 
         # 加载model
-        self.load_models(model_path)
+        if MONGO_CONNECTIONS:
+            self.load_models(model_path)
 
         # 加载celery(api端启动时也需要加载，让接口能抛出异步任务)
         if enable_celery:
@@ -110,9 +113,9 @@ class Adam(Flask):
             self.celery = None
 
         if 'websocket' in sys.argv:
-            from gevent import monkey
+            # from gevent import monkey
             from flask_socketio import SocketIO
-            monkey.patch_all()  # socketio要想与flask通信必须打补丁
+            # monkey.patch_all()  # socketio要想与flask通信必须打补丁。 交给外部统一处理(关键是提前处理)
             socketio = SocketIO(self, cors_allowed_origins=config_util.config.X_DOMAINS, async_mode='gevent',
                                 message_queue=config_util.config.REDIS_URL)
 
@@ -121,10 +124,14 @@ class Adam(Flask):
     def run(self, debug=None, **options):
         parser = argparse.ArgumentParser()
         parser.add_argument('-m', '--mode', choices=['route', 'api', 'web', 'websocket', 'worker', 'beat', 'monitor', 'shell'])
-        parser.add_argument('--pool', choices=['solo', 'gevent', 'prefork', 'eventlet'], default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
+        parser.add_argument('--pool',
+                            choices=['solo', 'gevent', 'prefork', 'eventlet', 'processes', 'threads', 'custom'],
+                            default='solo')  # 并发模型，可选：prefork (默认，multiprocessing), eventlet, gevent, threads.
         parser.add_argument('-l', '--loglevel', default='INFO')  # 日志级别，可选：DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL
         parser.add_argument('-c', '--concurrency', default='')  # 并发数量，prefork 模型下就是子进程数量，默认等于 CPU 核心数
-        parser.add_argument('-Q', '--queues', default=','.join(self.config.get('ALL_QUEUES')))
+        ALL_QUEUES = self.config.get('ALL_QUEUES')
+        if ALL_QUEUES:
+            parser.add_argument('-Q', '--queues', default=','.join(ALL_QUEUES))
         parser.add_argument('--prefetch-multiplier', default='')
         parser.add_argument('-f', '--logfile', default='')
         parser.add_argument('-p', '--port', default='')
@@ -132,6 +139,7 @@ class Adam(Flask):
         parser.add_argument('-w', '--workers', default=f'{multiprocessing.cpu_count()}')  # 启动的进程数
         parser.add_argument('-a', '--basic-auth', default='{}:{}'.format(self.config.get('MONITOR_USERNAME'), self.config.get('MONITOR_PASSWORD')))
         args, unknown_args = parser.parse_known_args()
+
         logfile = args.logfile or f'logs/{args.mode}.log'
         add_file_handler(logfile, args.loglevel)
 
@@ -163,12 +171,18 @@ class Adam(Flask):
             prog = prog.rstrip('__init__.py').rstrip(os.sep)
             # ugly: 通过修改 sys.argv 实现 gunicorn 启动参数的传递
             sys.argv = [prog, '-w', args.workers, '-b', f'{self.host}:{self.port}',
-                        f'--timeout={args.timeout}', f'--graceful-timeout={args.timeout}', '--keep-alive=5',  # 超时时间
-                        # '-k', 'gevent',  # 这会自动 monkey patch，可能会导致 http 请求出问题
-                        '--log-level=' + args.loglevel.lower(), '--log-file=logs/web_error.log', f'{app_module}:app']
+                        f'--timeout={args.timeout}', f'--graceful-timeout={args.timeout}', '--keep-alive=5']  # 超时时间
+            if args.pool == 'gevent':
+                sys.argv += ['-k', 'gevent']   # 启用 gevent 模型
+            sys.argv += ['--log-level=' + args.loglevel.lower(), '--log-file=logs/web_error.log', f'{app_module}:app']
             run(prog="gunicorn")
         elif args.mode == 'worker':
             celery_argv += ['worker', '-l', args.loglevel, '--pool', args.pool, '-Q', args.queues]
+            ''' 交给外部统一处理(关键是提前处理)
+            if args.pool == 'gevent':
+                from gevent import monkey
+                monkey.patch_all()
+            '''
             if args.concurrency:
                 celery_argv += ['-c', args.concurrency]
             if args.prefetch_multiplier:
@@ -254,10 +268,14 @@ class Adam(Flask):
         load all view
         """
         # Load native views
-        package_name = path.replace('/', '.').replace(os.sep, '.')
-        package = importlib.import_module(package_name)
-        customize_view_modules = import_submodules(package)
-        all_view_modules = list(customize_view_modules.values())
+        all_view_modules = []
+        try:
+            package_name = path.replace('/', '.').replace(os.sep, '.')
+            package = importlib.import_module(package_name)
+            customize_view_modules = import_submodules(package)
+            all_view_modules = list(customize_view_modules.values())
+        except (ImportError, ModuleNotFoundError):
+            pass
 
         lookup_view = lambda x: (inspect.isclass(x) and x != ResourceView
                                  and not getattr(x, "_meta", {}).get('abstract') and issubclass(x, ResourceView))

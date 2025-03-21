@@ -10,9 +10,10 @@ from http.client import IncompleteRead
 from urllib import request, parse
 
 from .str_util import gzip_decode, zlib_decode, decode2str
+from .json_util import CustomJSONEncoder
 
 
-__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params', 'sse_response')
+__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params')
 
 
 context = ssl._create_unverified_context()
@@ -126,6 +127,8 @@ def change_send_header(url, headers, force_header=False, send_json=False, use_zi
             _headers = headers
         else:
             _headers.update(headers)
+    else:
+        headers = {}
     if use_zip:
         _headers['Accept-Encoding'] = 'gzip, deflate'
     if send_json and not _headers.get('Content-Type'):
@@ -150,7 +153,8 @@ def change_send_data(url, method, data, send_json=False):
     if method.upper() == 'GET' and data:
         url += "&" if "?" in url else "?"
         if isinstance(data, dict):
-            data = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))) for k, v
+            data = {k: (v if isinstance(v, str) else
+                        json.dumps(v, ensure_ascii=False, separators=(',', ':'), cls=CustomJSONEncoder)) for k, v
                     in data.items()}
             data = parse.urlencode(data)
         data = data.decode() if isinstance(data, (bytes, bytearray)) else str(data)
@@ -159,9 +163,10 @@ def change_send_data(url, method, data, send_json=False):
     # 请求参数
     elif send_json:
         if data is not None and not isinstance(data, (bytes, str)):
-            data = json.dumps(data)
+            data = json.dumps(data, ensure_ascii=False, cls=CustomJSONEncoder)
     elif data and isinstance(data, dict):
-        data = {k: (v if isinstance(v, str) else json.dumps(v, ensure_ascii=False, separators=(',', ':'))) for k, v in
+        data = {k: (v if isinstance(v, str) else
+                    json.dumps(v, ensure_ascii=False, separators=(',', ':'), cls=CustomJSONEncoder)) for k, v in
                 data.items()}
         data = parse.urlencode(data)
     if data is not None and isinstance(data, str):
@@ -293,25 +298,3 @@ def get_request_params(url):
         result[key] = parse.unquote(value)  # 值需要转码
 
     return result
-
-
-def sse_response(event_name, data, index):
-    """
-    处理sse响应
-    :param event_name: sse事件名称
-    :param data: sse数据
-    :param index: sse数据索引
-    :return: sse响应
-    """
-    if index is None:
-        i = 0
-    else:
-        i = index[0]
-        index[0] += 1
-    if isinstance(data, (tuple, set)):
-        data = list(data)
-    if isinstance(data, (dict, list)):
-        data = json.dumps(data, ensure_ascii=False)
-    sse_data = f'id: {i}\nevent: {event_name}\ndata: {data}\n\n'
-    return sse_data
-

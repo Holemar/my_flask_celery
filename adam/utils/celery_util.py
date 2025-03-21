@@ -199,6 +199,21 @@ def delete_repeat_task():
         pass  # todo: 未实现
 
 
+def clear_tasks():
+    """清除所有任务"""
+    from ..flask_app import current_app as app
+    broker_url = app.celery.conf.broker_url
+    if broker_url.startswith('mongodb://'):
+        db = get_mongo_db(broker_url)
+        db.messages.remove({})
+    elif broker_url.startswith('redis://'):
+        conn = get_redis_client(broker_url)
+        conn.flushdb()
+    # 使用 RabbitMQ
+    elif broker_url.startswith(('amqp://', 'pyamqp://', 'rpc://')):
+        pass  # todo: 未实现
+
+
 def delete_redis_repeat_task(conn, queue, total):
     """删除指定queue的重复任务
     :param conn: 作为celery broker的 redis 数据库连接

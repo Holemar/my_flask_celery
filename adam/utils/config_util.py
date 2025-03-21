@@ -13,6 +13,7 @@ class Config(object):
 
     def __getattr__(self, name, default=None):
         # 默认取环境变量
+        name = name.upper()
         value = self._values.get(name) or os.environ.get(name) or default or self._default
         setattr(self, name, value)
         return value

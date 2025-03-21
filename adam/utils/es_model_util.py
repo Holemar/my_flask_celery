@@ -218,6 +218,8 @@ class EsModelUtil:
                     ]
                 }
             },
+            # "sort": [{"_id": {"order": "desc"}}],  # 按主键倒序排序(Elasticsearch 默认禁用了对 _id 字段的 fielddata 访问)
+            "sort": [{"created_at": {"order": "desc"}}],  # 按新增时间倒序排序
             "size": page_size
         }
         if query_params:
@@ -236,6 +238,8 @@ class EsModelUtil:
                         ]
                     }
                 },
+                # "sort": [{"_id": {"order": "desc"}}],  # 按主键倒序排序(Elasticsearch 默认禁用了对 _id 字段的 fielddata 访问)
+                "sort": [{"created_at": {"order": "desc"}}],  # 按新增时间倒序排序
                 "size": page_size
             }
         if include_fields:
