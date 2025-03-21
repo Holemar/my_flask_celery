@@ -252,7 +252,11 @@ TASK_ERROR_TIMES = int(os.environ.get('TASK_ERROR_TIMES') or 15)  # 任务出错
 
 
 # Database
-MONGO_CONNECTIONS = {}
+MONGO_CONNECTIONS = {
+    'default': os.environ.get('MONGO_URI') or 'mongodb://localhost:27017/my_db',
+    # 'broker': CELERY_CONFIG.broker_url,  # 如果使用 mongodb 作为中间件，则需要配置这里
+    # 'result_backend': CELERY_CONFIG.result_backend
+}
 
 
 # HTTP 的超时时间

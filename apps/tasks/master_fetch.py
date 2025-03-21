@@ -5,6 +5,7 @@ from datetime import datetime
 
 from celery import current_app
 import settings
+from adam.models.common import Common
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
     queue=settings.FETCH_TASK_QUEUE,
     schedule=5,  # 每隔 5 秒执行一次任务
 )
-def maim_fetch():
+async def maim_fetch():
     """
     抛出子任务
     使用self.request访问相关的属性，如：self.request.id, self.request.args, self.request.kwargs
@@ -28,7 +29,14 @@ def maim_fetch():
     _t = datetime.now()
     logger.info(f'master_fetch task id: {_id}, ts:{_t}')
 
-    fetch_task.delay([_id], _t)
+    ''' 数据库同步及异步操作示例
+    Common.update_sub_value('test', _t.strftime('%Y-%m-%d %H:%M:%S'), str(_id))
+    obj = Common(key=str(_id), value={'ts': _t.strftime('%Y-%m-%d %H:%M:%S')})
+    await obj.save_async()
+    '''
+
+    for i in range(100):
+        fetch_task.delay([_id], _t)
     # task.delay():这是apply_async方法的别名,但接受的参数较为简单；
     # task.apply_async(args=[arg1, arg2], kwargs={key:value, key:value},
     #     countdown : 设置该任务等待一段时间再执行，单位为s；

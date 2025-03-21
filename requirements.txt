@@ -16,8 +16,9 @@ celery==5.4.0
 dnspython==2.6.1
 
 # 安装 mongodb 和 redis
-pymongo==4.8.0
-mongoengine==0.28.2
+pymongo==4.11.3
+motor==3.7.0
+mongoengine==0.29.1
 redis==5.0.7
 
 # 安装 SQLAlchemy(使用 sqlite 作为 clery 数据储存时必须用 SQLAlchemy)

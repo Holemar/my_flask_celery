@@ -29,7 +29,7 @@ from ..exceptions import CommonException, BussinessCommonException, BaseError
 from ..utils.serializer import serialize, dict_to_mongo, mongo_to_dict
 from ..utils.url_util import parse_request, payload, get_param
 from ..fields import RelationField
-from ..documents.base import IDocument
+from ..documents.resource_document import ResourceDocument
 from .blueprint import return_data
 
 logger = logging.getLogger(__name__)
@@ -134,7 +134,7 @@ class ResourceView(object):
     def _patch_included(self, items, included_fields):
         if not included_fields:
             return items
-        if items and isinstance(items[0], IDocument):
+        if items and isinstance(items[0], ResourceDocument):
             for item in items:
                 for field in included_fields:
                     if field in self.model._fields and item[field] and isinstance(self.model._fields[field], LazyReferenceField):

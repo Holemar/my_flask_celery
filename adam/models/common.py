@@ -33,17 +33,17 @@ class Common(CacheDocument):
                 obj.value = value
                 obj.save()
                 cls.clear_cache()
-            return True
+            return obj
         # 没有，则新增
         obj = cls.objects.create(key=key, value=value)
         cls.clear_cache()
-        return True
+        return obj
 
     @classmethod
     def update_sub_value(cls, key, inner_key, value):
         """设置内嵌的字典值"""
         obj_value = cls.get_value(key) or {}
         obj_value[inner_key] = value
-        cls.set_value(key, obj_value)
-        return True
+        obj = cls.set_value(key, obj_value)
+        return obj
 

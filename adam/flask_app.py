@@ -27,7 +27,7 @@ from .utils.import_util import import_submodules, load_modules, import_string
 from .utils.url_util import RegexConverter, underscore
 from .utils.log_filter import WerkzeugLogFilter, add_file_handler
 from .views import ResourceView, Blueprint
-from .documents import ResourceDocument
+from .documents import ResourceDocument, register_connection as async_register_connection
 from .fields import RelationField
 from .middlewares import Middleware
 
@@ -94,7 +94,8 @@ class Adam(Flask):
         # Register mongoengine connections
         MONGO_CONNECTIONS = self.config.get('MONGO_CONNECTIONS', {})
         for k, v in MONGO_CONNECTIONS.items():
-            register_connection(alias=k, host=v)
+            register_connection(alias=k, host=v)  # 同步模式的 mongoengine 连接
+            async_register_connection(k, v)  # 异步模式的 mongoengine 连接
 
         self.views = {}
         self.models = {}

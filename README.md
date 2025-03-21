@@ -7,7 +7,7 @@
 |------------------|--------------------------------|
 | 启动 api 普通模式      | python3 main.py -m api     |
 | 启动 api 正式发布模式    | python3 main.py -m web     |
-| 启动 websocket    | python3 overseas.py -m websocket  |
+| 启动 websocket    | python3 main.py -m websocket  |
 | 启动 celery beat   | python3 main.py -m beat    |
 | 启动 celery worker | python3 main.py -m worker  |
 | 查看 api 接口        | python3 main.py -m route   |

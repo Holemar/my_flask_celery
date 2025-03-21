@@ -14,8 +14,8 @@ from mongoengine.fields import DateTimeField
 from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
 from ..utils.serializer import mongo_to_dict
-from .base import IDocument
-
+from ..utils.import_util import parse_csv_content
+from .async_document import *
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +60,13 @@ class MyQuerySet(QuerySetNoCache):
         if not hasattr(self, '_cls_query'):
             # remove class check mongoengine <0.19.0
             query.pop('class_check', False)
-            return super(QuerySetNoCache, self).__call__(q_obj, class_check=False, read_preference=query.pop('read_preference', None), **query)
+            return super(QuerySetNoCache, self).__call__(q_obj, class_check=False,
+                                                         read_preference=query.pop('read_preference', None), **query)
         else:
             return super(QuerySetNoCache, self).__call__(q_obj, **query)
 
 
-class ResourceDocument(Document, IDocument):
+class ResourceDocument(Document):
     """
     ResourceDocument
     """
@@ -203,14 +204,15 @@ class ResourceDocument(Document, IDocument):
             result = queryset_obj.clear_cls_query().update_one(upsert=False, write_concern=None, **kwargs)
         else:
             # remove class check mongoengine 0.15.0
-            result = self.__class__.objects(id=self.id, class_check=False).update_one(upsert=False, write_concern=None, **kwargs)
+            result = self.__class__.objects(id=self.id, class_check=False).update_one(upsert=False, write_concern=None,
+                                                                                      **kwargs)
         if enable_hook:
             self.after_update(kwargs)
         return result
 
     @classmethod
     def is_valid_id(cls, _id):
-      return ObjectId.is_valid(_id)
+        return ObjectId.is_valid(_id)
 
     @classmethod
     def batch_insert(cls, items):
@@ -220,17 +222,8 @@ class ResourceDocument(Document, IDocument):
         return cls.objects.insert(docs)
 
     @classmethod
-    def build_object(cls, data):
-      return cls(**data)
-
-    @classmethod
     def find_one(cls, condition):
         return cls.objects.get(**condition)
-
-    @classmethod
-    def find_one_by_id(cls, id):
-        item_condition = {'id': id}
-        return cls.objects.get(**item_condition)
 
     @classmethod
     def find_by_ids(cls, ids):
@@ -268,9 +261,6 @@ class ResourceDocument(Document, IDocument):
     def to_dict(self, exclude_fields=[], date_format=None, without_none=False):
         return mongo_to_dict(self, exclude_fields=exclude_fields, date_format=date_format, without_none=without_none)
 
-    def from_dict(self):
-        return mongo_to_dict(self)
-
     def real_changed_fields(self):
         changes = []
         if hasattr(self, '_changed_fields'):
@@ -290,3 +280,54 @@ class ResourceDocument(Document, IDocument):
         if not changes and hasattr(self, '_fields_changed'):
             return self._fields_changed
         return changes
+
+    @classmethod
+    def get_schema(cls):
+        schema_mapping = cls.get_schema_mapping()
+        properties = []
+        for name, field in cls.get_fields().items():
+            if field.__class__ in schema_mapping:
+                properties.append({
+                    'name': name,
+                    'type': schema_mapping[field.__class__]
+                })
+        return {
+            'properties': properties
+        }
+
+    @classmethod
+    def import_csv(cls, data):
+        import_options = {}
+
+        # TBD
+        if hasattr(cls, 'meta'):
+            import_options = cls.meta.get('import_options') or {}
+        elif hasattr(cls, '_meta'):
+            import_options = cls._meta.get('import_options') or {}
+
+        value = {}
+        form = import_options['form']
+        fields = import_options['fields']
+
+        for field in form:
+            key = field
+            value[key] = data.get(key)
+
+        content = data.get('content', '')
+        result = parse_csv_content(content, fields)
+        result = list(map(lambda x: {**value, **x}, result))
+        items = cls.batch_insert(result)
+        return items
+
+    # 以下为异步方法
+    get_motor_collection = classmethod(get_motor_collection)
+    build_document = classmethod(build_document)
+    find_one_async = classmethod(find_one_async)
+    find_one_and_update_async = classmethod(find_one_and_update_async)
+    find = classmethod(find)
+    find_async = classmethod(find_async)
+    save_async = save_async
+    count_async = classmethod(count_async)
+    update_many_async = classmethod(update_many_async)
+    delete_many_async = classmethod(delete_many_async)
+    aggregate_async = classmethod(aggregate_async)

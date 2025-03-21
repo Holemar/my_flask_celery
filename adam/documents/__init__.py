@@ -1,4 +1,4 @@
 # -*- coding: utf-8 -*-
 
-from .base import IDocument
 from .resource_document import ResourceDocument
+from .async_document import register_connection
