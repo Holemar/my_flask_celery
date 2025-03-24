@@ -80,13 +80,19 @@ class BaseTask(current_app.Task):
             loop = cls._get_event_loop()
             return loop.run_until_complete(res)
 
-        # yield 生成器函数(途中各 yield 语句返回的值会被丢弃，只返回最后 return 的值)
+        # yield 生成器函数(途中各 yield 语句返回的值会被拼接到一起，最后以 list 形式一起返回)
         if inspect.isgenerator(res):
+            results = []
             while True:
                 try:
                     value = next(res)
+                    results.append(value)
                 except StopIteration as e:
-                    return e.value or {}
+                    value = e.value or None
+                    if value is not None:
+                        results.append(value)
+                    return results
+
         return res
 
     def __call__(self, *args, **kwargs):

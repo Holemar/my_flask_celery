@@ -8,14 +8,16 @@ import os
 import json
 import copy
 import logging
+import inspect
+import asyncio
 import traceback
-import requests
 from io import StringIO
 from io import BytesIO
 import zipfile
 from datetime import datetime
 from urllib.parse import quote
 
+import requests
 import mongoengine
 from mongoengine import Document
 from flask import request, Response
@@ -240,13 +242,7 @@ class ResourceView(object):
                     response = function(**kwargs)
                 else:
                     BaseError.data_not_exist()
-            if isinstance(response, Response):
-                return response
-            elif isinstance(response, requests.models.Response):
-                headers = dict(response.headers)
-                return Response(response.content, response.status_code, headers=headers)
-            else:
-                return self.render_obj(response)
+            return self.render_obj(response)
         except mongoengine.queryset.DoesNotExist as ex:
             return self.render_error(404, '数据不存在', ex)
         except Unauthorized as ex:
@@ -271,6 +267,30 @@ class ResourceView(object):
 
     def render_obj(self, obj):
         included = None
+
+        # async 异步函数
+        if inspect.iscoroutine(obj):
+            obj = asyncio.run(obj)
+        # yield 生成器函数(途中各 yield 语句返回的值会被拼接到一起，最后以 list 形式一起返回)
+        elif inspect.isgenerator(obj):
+            results = []
+            while True:
+                try:
+                    value = next(obj)
+                    results.append(value)
+                except StopIteration as e:
+                    value = e.value or None
+                    if value is not None:
+                        results.append(value)
+                    obj = results
+                    break
+
+        if isinstance(obj, Response):
+            return obj
+        elif isinstance(obj, requests.models.Response):
+            headers = dict(obj.headers)
+            return Response(obj.content, obj.status_code, headers=headers)
+
         if hasattr(request, 'req'):
             included = request.req.included or []
         # 强行封装成统一格式
