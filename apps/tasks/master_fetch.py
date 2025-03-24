@@ -34,6 +34,10 @@ async def maim_fetch():
     obj = Common(key=str(_id), value={'ts': _t.strftime('%Y-%m-%d %H:%M:%S')})
     await obj.save_async()
     '''
+    Common.update_sub_value('test', _t.strftime('%Y-%m-%d %H:%M:%S'), str(_id))
+    c = await Common.objects.filter(key='test').get_async()
+    async for c in Common.objects.filter().order_by('-id').skip(0).limit(10).all_async():
+        logger.info(f'all_async: {c.key}, {c.value}')
 
     for i in range(100):
         fetch_task.delay([_id], _t)

@@ -7,63 +7,16 @@ import logging
 from datetime import datetime
 
 from mongoengine import Document, queryset_manager
-from mongoengine.queryset.visitor import Q
 from mongoengine.fields import DateTimeField
-from mongoengine.queryset import QuerySetNoCache
 from bson import ObjectId
 from ..utils.serializer import mongo_to_dict
 from ..utils.import_util import parse_csv_content
+from .my_query_set import MyQuerySet
 from .async_document import get_motor_collection, build_document, find_one_async, find_one_and_update_async, find, \
     find_async, save_async, count_async, update_many_async, delete_many_async, aggregate_async
 
 
 logger = logging.getLogger(__name__)
-
-
-class MyQuerySet(QuerySetNoCache):
-    """
-    MyQuerySet
-    """
-
-    def __init__(self, document, collection):
-        super(QuerySetNoCache, self).__init__(document, collection)
-
-        # 禁用始终包含_cls的查询过滤.
-        # _loaded_fields: mongoengine 0.15.0版本
-        # _cls_query: mongoengine > 0.19.0版本
-        if hasattr(self, '_cls_query'):
-            self._cls_query = {}
-        elif hasattr(self, '_loaded_fields'):
-            self._loaded_fields.always_include = set([])
-
-    def by_own(self, user):
-        return self.filter(user=user.id)
-
-    def by_users(self, users, share_filter=None):
-        q = Q(user__in=users)
-        if share_filter is not None:
-            return self.filter(Q(**share_filter) | q)
-        else:
-            return self.filter(q)
-
-    def by_company(self, company):
-        return self.filter(owned_company=company.id)
-
-    def by_companies(self, companies, share_filter=None):
-        q = Q(owned_company__in=companies)
-        if share_filter is not None:
-            return self.filter(Q(**share_filter) | q)
-        else:
-            return self.filter(q)
-
-    def __call__(self, q_obj=None, **query):
-        if not hasattr(self, '_cls_query'):
-            # remove class check mongoengine <0.19.0
-            query.pop('class_check', False)
-            return super(QuerySetNoCache, self).__call__(q_obj, class_check=False,
-                                                         read_preference=query.pop('read_preference', None), **query)
-        else:
-            return super(QuerySetNoCache, self).__call__(q_obj, **query)
 
 
 class ResourceDocument(Document):
