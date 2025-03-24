@@ -105,8 +105,7 @@ async def count_async(cls, filter: Mapping[str, Any], session: Optional[ClientSe
 
 async def update_many_async(
         cls, filter: Mapping[str, Any],
-        update: Union[Mapping[str, Any],
-        Sequence[Mapping[str, Any]]],
+        update: Union[Mapping[str, Any], Sequence[Mapping[str, Any]]],
         upsert: bool = False,
         array_filters: Optional[Sequence[Mapping[str, Any]]] = None,
         bypass_document_validation: Optional[bool] = None, collation=None,

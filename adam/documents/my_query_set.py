@@ -4,11 +4,10 @@
 """
 import logging
 
+from bson import ObjectId
 from mongoengine.queryset.visitor import Q
 from mongoengine.queryset import QuerySetNoCache
 from ..utils.serializer import mongo_to_dict
-from .async_document import get_motor_collection, build_document, find_one_async, find_one_and_update_async, find, \
-    find_async, save_async, count_async, update_many_async, delete_many_async, aggregate_async
 
 
 logger = logging.getLogger(__name__)
@@ -79,6 +78,7 @@ class MyQuerySet(QuerySetNoCache):
         :rtype: dict of ObjectId's as keys and collection-specific
                 Document subclasses as values.
         """
+        object_ids = [ObjectId(i) for i in object_ids]
         async for doc in self._document.find_async({"_id": {"$in": object_ids}}, **self._cursor_args):
             yield doc
 
@@ -109,5 +109,5 @@ class MyQuerySet(QuerySetNoCache):
         return await self._document.delete_many_async(self._query)
 
     async def update_async(self, **update):
-        return await self._document.update_many_async(filter=self._query, update=update)
+        return await self._document.update_many_async(filter=self._query, update={'$set': update})
 
