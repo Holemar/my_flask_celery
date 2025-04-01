@@ -13,7 +13,7 @@ from .str_util import gzip_decode, zlib_decode, decode2str
 from .json_util import CustomJSONEncoder
 
 
-__all__ = ('get_html', 'get_zip_response', 'download_file', 'get_host', 'get_request_params')
+__all__ = ('get_html', 'get_zip_response', 'download_file', 'download_file_io', 'get_host', 'get_request_params')
 
 
 context = ssl._create_unverified_context()
@@ -40,7 +40,7 @@ base_headers = {
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    'Sec-Ch-Ua': 'Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+    'Sec-Ch-Ua': '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
     # 'Referrer Policy': 'strict-origin-when-cross-origin',
 }
 
@@ -256,6 +256,33 @@ def download_file(url, data=None, method='GET', file_path=None, headers=None, fo
             # 请求异常,认为返回不正确
             repeat_time -= 1
             logging.error(u"download_file error: %s  url:%s, file_path:%s", e, url, file_path)
+
+
+def download_file_io(url, data=None, method='GET', headers=None, force_header=False, check_fun=None,
+                     send_json=False, timeout=TIMEOUT):
+    """文件下载，返回文件流"""
+    global http_repeat_time
+    # 处理请求头
+    _headers = change_send_header(url, headers, force_header=force_header, send_json=send_json)
+    # 请求参数处理
+    url, data = change_send_data(url, method, data, send_json=send_json)
+
+    repeat_time = http_repeat_time
+    # 允许出错时重复提交多次,只要设置了 repeat_time 的次数
+    while repeat_time > 0:
+        try:
+            req = request.Request(url=url, data=data, headers=_headers, method=method)
+            if url.lower().startswith('https'):
+                response = request.urlopen(req, timeout=timeout, context=context)
+            else:
+                response = request.urlopen(req, timeout=timeout)
+            file_io = response.read()
+            logging.info('... download_file_io ... %s', url)
+            return file_io
+        except Exception as e:
+            # 请求异常,认为返回不正确
+            repeat_time -= 1
+            logging.error(u"download_file_io error: %s  url:%s", e, url)
 
 
 def get_host(url):
