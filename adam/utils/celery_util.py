@@ -175,8 +175,7 @@ def load_task(path, app=None):
 
 def delete_repeat_task():
     """删除重复的任务(任务可能太久没执行完，从而再次抛出导致重复)"""
-    from ..flask_app import current_app as app
-    broker_url = app.celery.conf.broker_url
+    broker_url = config.CELERY_CONFIG.broker_url
     queues = config.ALL_QUEUES
     limit_tasks = config.LIMIT_TASK
 
@@ -205,8 +204,7 @@ def delete_repeat_task():
 
 def clear_tasks():
     """清除所有任务"""
-    from ..flask_app import current_app as app
-    broker_url = app.celery.conf.broker_url
+    broker_url = config.CELERY_CONFIG.broker_url
     if broker_url.startswith('mongodb://'):
         db = get_mongo_db(broker_url)
         db.messages.remove({})
@@ -292,7 +290,7 @@ def get_pending_msg():
             logger.exception(f'获取队列{key}信息失败:{e}')
 
     """
-    broker_url = app.celery.conf.broker_url
+    broker_url = config.CELERY_CONFIG.broker_url
     if broker_url.startswith('mongodb://'):
         db = get_mongo_db(broker_url)
         # total_msg = db.messages.count_documents()
