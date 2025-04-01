@@ -136,6 +136,7 @@ def load_task(path, app=None):
     from ..celery_base_task import BaseTask
     app = app or current_app
     app.Task = BaseTask
+    tasks = BaseTask.tasks
 
     task_classes = lambda x: inspect.isclass(x) and x != Task and x != BaseTask and issubclass(x, Task)
     task_processors = lambda x: isinstance(x, Task)
@@ -146,6 +147,7 @@ def load_task(path, app=None):
             task_name = _task_func.name
             logger.info('Loading Task (PRC): %s %s', k, task_name)
             app.register_task(_task_func)
+            tasks[task_name] = _task_func
             if hasattr(_task_func, 'schedule') and getattr(_task_func, 'schedule', None):
                 BEAT_SCHEDULE[task_name] = {
                     'task': task_name,
@@ -159,6 +161,7 @@ def load_task(path, app=None):
             logger.info('Loading Task (CLS): %s %s', _name, task_name)
             _task = _task_cls()
             app.register_task(_task)
+            tasks[task_name] = _task
             if hasattr(_task_cls, 'schedule') and getattr(_task_cls, 'schedule', None):
                 BEAT_SCHEDULE[task_name] = {
                     'task': task_name,
@@ -167,6 +170,7 @@ def load_task(path, app=None):
                 delattr(_task_cls, 'schedule')  # 去掉 schedule 属性，避免重复执行
     app.conf.beat_schedule = BEAT_SCHEDULE
     logger.info(f'BEAT_SCHEDULE:{BEAT_SCHEDULE}')
+    return tasks
 
 
 def delete_repeat_task():

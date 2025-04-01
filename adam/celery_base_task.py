@@ -22,6 +22,7 @@ class BaseTask(current_app.Task):
     max_retries = 3  # 最大重试次数
     default_retry_delay = 1  # 默认重试间隔(秒)
     event_loop = None  # 事件循环
+    tasks = {}  # 任务字典
 
     ''' 用到的再拿出来，没有用到的先注释掉
     def before_start(self, task_id, args, kwargs):
@@ -125,6 +126,14 @@ class BaseTask(current_app.Task):
                 logger.warning('任务耗时太长:%.4f秒, task:%s, 参数: %s', duration, task_name, (_args, kwargs))
             else:
                 logger.debug('执行任务耗时:%.4f秒, task:%s, 参数: %s', duration, task_name, (_args, kwargs))
+
+    @classmethod
+    def send_pulsar(cls, *args, user_id=None, company_id=None, queue=None, priority=0, **kwargs):
+        """发送消息到 pulsar 队列"""
+        from .utils.pulsar_util import send_message
+        obj = cls()
+        return send_message(task_name=obj.name, args=args, kwargs=kwargs, user_id=user_id, company_id=company_id,
+                            queue=queue or obj.queue, priority=priority or obj.priority)
 
 
 

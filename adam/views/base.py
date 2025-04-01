@@ -33,6 +33,7 @@ from ..utils.url_util import parse_request, payload, get_param
 from ..fields import RelationField
 from ..documents.resource_document import ResourceDocument
 from .blueprint import return_data
+from ..celery_base_task import BaseTask
 
 logger = logging.getLogger(__name__)
 _env = os.environ.get('ENV') or 'development'
@@ -270,7 +271,9 @@ class ResourceView(object):
 
         # async 异步函数
         if inspect.iscoroutine(obj):
-            obj = asyncio.run(obj)
+            # obj = asyncio.run(obj)
+            loop = BaseTask._get_event_loop()
+            obj = loop.run_until_complete(obj)
         # yield 生成器函数(途中各 yield 语句返回的值会被拼接到一起，最后以 list 形式一起返回)
         elif inspect.isgenerator(obj):
             results = []

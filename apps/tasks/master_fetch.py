@@ -40,8 +40,9 @@ async def maim_fetch():
         logger.info(f'all_async: {c.key}, {c.value}')
     '''
 
-    for i in range(100):
-        fetch_task.delay([_id], _t)
+    # for i in range(100):
+    #     fetch_task.delay([_id], _t)
+
     # task.delay():这是apply_async方法的别名,但接受的参数较为简单；
     # task.apply_async(args=[arg1, arg2], kwargs={key:value, key:value},
     #     countdown : 设置该任务等待一段时间再执行，单位为s；

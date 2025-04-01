@@ -7,6 +7,7 @@ import socket
 # debug=true 时，log 会变成 debug 级别(默认 info 级别)
 DEBUG = os.environ.get('DEBUG', '').lower() in ('true', '1')
 ENV = os.environ.get('ENV') or 'development'  # production, development, test
+APP_NAME = os.environ.get('APP_NAME', 'my_app')  # 项目名称
 
 # 默认时区设置
 TIME_ZONE = os.environ.get('TZ') or os.environ.get('TIME_ZONE') or 'Etc/GMT'  # 'Asia/Shanghai'
@@ -262,3 +263,7 @@ MONGO_CONNECTIONS = {
 # HTTP 的超时时间
 SOCKET_TIMEOUT = int(os.environ.get('SOCKET_TIMEOUT') or 30)
 socket.setdefaulttimeout(SOCKET_TIMEOUT)
+
+# pulsar 相关配置
+PULSAR_URL = os.environ.get('PULSAR_URL', 'pulsar://localhost:6650')
+PULSAR_TOPIC = os.environ.get('PULSAR_TOPIC', f'persistent://public/default/{APP_NAME}')

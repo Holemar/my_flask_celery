@@ -74,3 +74,6 @@ pygments==2.18.0
 matplotlib-inline==0.1.7
 ipython==8.27.0
 
+
+# pulsar
+pulsar-client==3.6.1
